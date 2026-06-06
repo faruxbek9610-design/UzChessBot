@@ -1,3 +1,4 @@
+import os
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
 from telegram.ext import Application, CommandHandler, ContextTypes
 from database.database import SessionLocal
@@ -17,8 +18,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_or_create_user(db, telegram_id=telegram_id, username=username)
     db.close()
 
-    # Veb-sahifamiz manzili (Hozircha lokal serverimiz)
-    web_app_url = "http://127.0.0.1:8000/"
+    # DIQQAT: Render'da https ishlasa onlayn url, lokal kompyuterda http ishlaydi
+    # Bu usul loyihangizni ham uydagi kompyuterda, ham serverda xatosiz yurgizadi!
+    if os.environ.get("PORT"):
+        web_app_url = "https://uzchessbot.onrender.com/"
+    else:
+        web_app_url = "http://127.0.0.1:8000/"
 
     # Telegram bot ichida oynani ochadigan maxsus WebApp tugmalari
     keyboard = [
