@@ -28,21 +28,20 @@ def get_db():
     finally:
         db.close()
 
-# 1. Foydalanuvchi Web App'ni ochganda index.html sahifasini ko'rsatish (Frontend eshigi)
+# 1. Foydalanuvchi Web App'ni ochganda index.html sahifasini ko'rsatish
 @app.get("/", response_class=HTMLResponse)
 def read_index(request: Request):
-    # TypeError xatoligini oldini olish uchun argumentlar nomi bilan uzatiladi
     return templates.TemplateResponse(request=request, name="index.html")
 
-# 2. O'yinchi Web App'da o'yin yaratganda chaqiriladigan API yo'li (Backend endpointi)
+# 2. O'yinchi Web App'da o'yin yaratganda chaqiriladigan API yo'li
 @app.post("/api/game/create")
 def api_create_game(creator_id: int, time_limit: int, chosen_color: str, db: Session = Depends(get_db)):
     try:
         # Ma'lumotlar bazasida o'yin yaratamiz
         game = create_custom_game(db, creator_id=creator_id, time_limit=time_limit, chosen_color=chosen_color)
         
-        # O'yin havolasini bot manziliga moslab yasaymiz
-        game_url = f"https://t.me/UzChess_Match_bot/app?startapp=game_{game.id}"
+        # 🔥 DIQQAT: Bot yuzerneymi sizniki bilan almashtirildi!
+        game_url = f"https://t.me/UzCheess_bot/app?startapp=game_{game.id}"
         
         return {
             "status": "success",
