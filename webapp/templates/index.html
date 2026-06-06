@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UzChess Match - O'yin Yaratish</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: #262626;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+        }
+        h2 { color: #f0d9b5; margin-bottom: 25px; }
+        
+        .section {
+            margin-bottom: 25px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #ccc;
+        }
+        .time-presets, .color-selector, .mode-selector {
+            display: flex;
+            gap: 10px;
+        }
+        .preset-btn, .color-btn, .mode-btn {
+            flex: 1;
+            background-color: #333;
+            color: #fff;
+            border: 2px solid #444;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+            font-size: 13px;
+        }
+        .preset-btn:hover, .color-btn:hover, .mode-btn:hover { 
+            background-color: #444; 
+            border-color: #f0d9b5; 
+        }
+        .color-btn.active, .preset-btn.active, .mode-btn.active { 
+            background-color: #f0d9b5; 
+            color: #1a1a1a; 
+            border-color: #b59963; 
+        }
+        
+        /* Slayder dizayni */
+        input[type=range] {
+            width: 100%;
+            margin: 10px 0;
+            accent-color: #f0d9b5;
+        }
+        
+        .create-game-btn {
+            width: 100%;
+            background-color: #81b64c;
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(129, 182, 76, 0.3);
+            transition: 0.2s;
+            margin-top: 10px;
+        }
+        .create-game-btn:hover { background-color: #a3d16c; transform: translateY(-1px); }
+        
+        /* Elementlarni yashirish uchun unutilgan klass */
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>UzChess Match ⚔️</h2>
+        
+        <div class="section">
+            <label>O'yin Turini Tanlang:</label>
+            <div class="mode-selector">
+                <button type="button" class="mode-btn active" id="mode-friend" onclick="setMode('friend')">Do'st bilan ⚔️</button>
+                <button type="button" class="mode-btn" id="mode-random" onclick="setMode('random')">Tasodifiy Raqib 🎲</button>
+            </div>
+        </div>
+
+        <div id="friend-settings-block">
+            <div class="section">
+                <label>Standart Vaqtni Tanlang:</label>
+                <div class="time-presets">
+                    <button type="button" class="preset-btn" id="preset-60" onclick="setPreset(60)">1 daq</button>
+                    <button type="button" class="preset-btn active" id="preset-300" onclick="setPreset(300)">5 daq</button>
+                    <button type="button" class="preset-btn" id="preset-600" onclick="setPreset(600)">10 daq</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <label>Yoki mustaqil vaqt belgilang: <span id="time-display" style="color: #f0d9b5; font-weight: bold;">5 daqiqa</span></label>
+                <input type="range" id="time-slider" min="60" max="1800" step="60" value="300" oninput="updateSliderDisplay(this.value)">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #aaa;">
+                    <span>1 daq</span>
+                    <span>30 daq</span>
+                </div>
+            </div>
+
+            <div class="section">
+                <label>Dona Rangini Tanlang:</label>
+                <div class="color-selector">
+                    <button type="button" class="color-btn active" id="color-white" onclick="setColor('white')">Oq 🏳️</button>
+                    <button type="button" class="color-btn" id="color-random" onclick="setColor('random')">Ixtiyoriy 🎲</button>
+                    <button type="button" class="color-btn" id="color-black" onclick="setColor('black')">Qora 🏴</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="random-settings-block" class="hidden">
+            <p style="font-size: 14px; color: #aaa; text-align: left; line-height: 1.5;">
+                * Tasodifiy o'yin rejimida tizim sizga mos reytingdagi raqibni avtomat qidiradi. Vaqt standart 5 daqiqa etib belgilanadi va dona ranglari o'yin boshlanganda tasodifiy (random) taqsimlanadi.
+            </p>
+        </div>
+
+        <button class="create-game-btn" id="action-btn" onclick="generateGameLink()">O'yin havolasini yaratish 🔗</button>
+    </div>
+
+    <script>
+        // JS mantiqiy o'zgaruvchilari
+        let selectedMode = 'friend';
+        let selectedColor = 'white';
+        let currentTimeValue = 300; // soniyalarda (5 daqiqa)
+
+        // O'yin turini o'zgartirish (Do'st yoki Random)
+        function setMode(mode) {
+            selectedMode = mode;
+            document.getElementById('mode-friend').classList.remove('active');
+            document.getElementById('mode-random').classList.remove('active');
+            document.getElementById('mode-' + mode).classList.add('active');
+
+            const friendBlock = document.getElementById('friend-settings-block');
+            const randomBlock = document.getElementById('random-settings-block');
+            const actionBtn = document.getElementById('action-btn');
+
+            if (mode === 'friend') {
+                friendBlock.classList.remove('hidden');
+                randomBlock.classList.add('hidden');
+                actionBtn.innerText = "O'yin havolasini yaratish 🔗";
+            } else {
+                friendBlock.classList.add('hidden');
+                randomBlock.classList.remove('hidden');
+                actionBtn.innerText = "Raqib qidirishni boshlash 🔍";
+            }
+        }
+
+        // Standart tugmalar bosilganda slayderni ham moslash
+        function setPreset(seconds) {
+            currentTimeValue = seconds;
+            document.getElementById('time-slider').value = seconds;
+            updateSliderDisplay(seconds);
+            
+            // Aktiv tugma klasslarini yangilash
+            document.getElementById('preset-60').classList.remove('active');
+            document.getElementById('preset-300').classList.remove('active');
+            document.getElementById('preset-600').classList.remove('active');
+            
+            if(seconds === 60 || seconds === 300 || seconds === 600) {
+                document.getElementById('preset-' + seconds).classList.add('active');
+            }
+        }
+
+        // Slayder surilganda matnni yangilash
+        function updateSliderDisplay(seconds) {
+            currentTimeValue = parseInt(seconds);
+            const minutes = currentTimeValue / 60;
+            document.getElementById('time-display').innerText = minutes + " daqiqa";
+            
+            // Standart tugmalardan aktivlikni olib tashlash (agar slayder boshqa vaqtga surilsa)
+            if (seconds != 60 && seconds != 300 && seconds != 600) {
+                document.getElementById('preset-60').classList.remove('active');
+                document.getElementById('preset-300').classList.remove('active');
+                document.getElementById('preset-600').classList.remove('active');
+            } else {
+                document.getElementById('preset-60').classList.remove('active');
+                document.getElementById('preset-300').classList.remove('active');
+                document.getElementById('preset-600').classList.remove('active');
+                document.getElementById('preset-' + seconds).classList.add('active');
+            }
+        }
+
+        // Rangni tanlash
+        function setColor(color) {
+            selectedColor = color;
+            document.getElementById('color-white').classList.remove('active');
+            document.getElementById('color-random').classList.remove('active');
+            document.getElementById('color-black').classList.remove('active');
+            document.getElementById('color-' + color).classList.add('active');
+        }
+
+        // Tugma bosilganda ishga tushadigan asosiy funksiya
+        function generateGameLink() {
+            if (selectedMode === 'friend') {
+                alert(`Sozlamalar saqlandi!\nSiz tanlagan vaqt: ${currentTimeValue / 60} daqiqa\nDona rangi: ${selectedColor}\n\nTez orada API orqali havola yaratiladi.`);
+            } else {
+                alert("Tasodifiy raqib qidirilmoqda... Vaqt: 5 daqiqa, Rang: Random 🎲");
+            }
+        }
+    </script>
+</body>
+</html>
