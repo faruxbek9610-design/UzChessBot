@@ -136,7 +136,7 @@
             </p>
         </div>
 
-        <button class="create-game-btn" id="action-btn" onclick="generateGameLink()">O'yin havolasini yaratish 🔗</button>
+        <button class="create-game-btn" id="action-btn" onclick="generateGameLink()">Do'stni taklif qilish ✉️</button>
     </div>
 
     <script>
@@ -144,10 +144,9 @@
         let selectedColor = 'white';
         let currentTimeValue = 300; 
 
-        // Telegram Mini App oynasini sozlaymiz
         if (window.Telegram && window.Telegram.WebApp) {
             window.Telegram.WebApp.ready();
-            window.Telegram.WebApp.expand(); // Oynani kattartirib ochish
+            window.Telegram.WebApp.expand();
         }
 
         function setMode(mode) {
@@ -163,7 +162,7 @@
             if (mode === 'friend') {
                 friendBlock.classList.remove('hidden');
                 randomBlock.classList.add('hidden');
-                actionBtn.innerText = "O'yin havolasini yaratish 🔗";
+                actionBtn.innerText = "Do'stni taklif qilish ✉️";
             } else {
                 friendBlock.classList.add('hidden');
                 randomBlock.classList.remove('hidden');
@@ -199,18 +198,17 @@
             document.getElementById('color-' + color).classList.add('active');
         }
 
-        // ASOSIY API BOG'LANISH QISMI
         async function generateGameLink() {
-            let creatorId = 123456; // Agar bot tashqarida ochilsa test uchun id
+            let creatorId = 123456; 
+            let creatorName = "O'yinchi";
 
-            // Telegram Mini App foydalanuvchisining haqiqiy ID sini olamiz
             if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe.user) {
                 creatorId = window.Telegram.WebApp.initDataUnsafe.user.id;
+                creatorName = window.Telegram.WebApp.initDataUnsafe.user.first_name;
             }
 
             if (selectedMode === 'friend') {
                 try {
-                    // API yo'lagiga URL orqali ma'lumotlarni uzatamiz (Sizning backend formatingizga moslab)
                     const url = `/api/game/create?creator_id=${creatorId}&time_limit=${currentTimeValue}&chosen_color=${selectedColor}`;
                     
                     const response = await fetch(url, {
@@ -221,11 +219,16 @@
                     const data = await response.json();
 
                     if (response.ok) {
-                        // Havolani muvaffaqiyatli olgach chiqariladigan xabar
-                        alert(`Muvaffaqiyatli! 🎉\n\nO'yin ID: ${data.game_id}\n${data.message}`);
+                        // Chiroyli taklifnoma matni tayyorlaymiz
+                        const inviteText = encodeURIComponent(`Salom! Men bilan shaxmat o'ynaysizmi? ⚔️\n⏱ Vaqt: ${currentTimeValue / 60} daqiqa\n🎨 Rangim: ${selectedColor === 'white' ? 'Oq 🏳️' : selectedColor === 'black' ? 'Qora 🏴' : 'Ixtiyoriy 🎲'}`);
+                        
+                        // Telegramning ichki ulashish (Share) havolasini ochamiz. Bu to'g'ridan-to'g'ri kontaktlarni ochadi!
+                        const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(data.game_url)}&text=${inviteText}`;
                         
                         if (window.Telegram && window.Telegram.WebApp) {
-                            window.Telegram.WebApp.close(); // Ish bitgach Mini Appni yopish
+                            window.Telegram.WebApp.openTelegramLink(shareUrl);
+                        } else {
+                            window.open(shareUrl, '_blank');
                         }
                     } else {
                         alert("Xatolik yuz berdi: " + data.detail);
