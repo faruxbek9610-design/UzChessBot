@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UzChess Match - O'yin Yaratish</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -62,7 +63,6 @@
             border-color: #b59963; 
         }
         
-        /* Slayder dizayni */
         input[type=range] {
             width: 100%;
             margin: 10px 0;
@@ -85,7 +85,6 @@
         }
         .create-game-btn:hover { background-color: #a3d16c; transform: translateY(-1px); }
         
-        /* Elementlarni yashirish uchun unutilgan klass */
         .hidden { display: none !important; }
     </style>
 </head>
@@ -141,12 +140,16 @@
     </div>
 
     <script>
-        // JS mantiqiy o'zgaruvchilari
         let selectedMode = 'friend';
         let selectedColor = 'white';
-        let currentTimeValue = 300; // soniyalarda (5 daqiqa)
+        let currentTimeValue = 300; 
 
-        // O'yin turini o'zgartirish (Do'st yoki Random)
+        // Telegram Mini App oynasini sozlaymiz
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand(); // Oynani kattartirib ochish
+        }
+
         function setMode(mode) {
             selectedMode = mode;
             document.getElementById('mode-friend').classList.remove('active');
@@ -168,42 +171,26 @@
             }
         }
 
-        // Standart tugmalar bosilganda slayderni ham moslash
         function setPreset(seconds) {
             currentTimeValue = seconds;
             document.getElementById('time-slider').value = seconds;
             updateSliderDisplay(seconds);
-            
-            // Aktiv tugma klasslarini yangilash
-            document.getElementById('preset-60').classList.remove('active');
-            document.getElementById('preset-300').classList.remove('active');
-            document.getElementById('preset-600').classList.remove('active');
-            
-            if(seconds === 60 || seconds === 300 || seconds === 600) {
-                document.getElementById('preset-' + seconds).classList.add('active');
-            }
         }
 
-        // Slayder surilganda matnni yangilash
         function updateSliderDisplay(seconds) {
             currentTimeValue = parseInt(seconds);
             const minutes = currentTimeValue / 60;
             document.getElementById('time-display').innerText = minutes + " daqiqa";
             
-            // Standart tugmalardan aktivlikni olib tashlash (agar slayder boshqa vaqtga surilsa)
-            if (seconds != 60 && seconds != 300 && seconds != 600) {
-                document.getElementById('preset-60').classList.remove('active');
-                document.getElementById('preset-300').classList.remove('active');
-                document.getElementById('preset-600').classList.remove('active');
-            } else {
-                document.getElementById('preset-60').classList.remove('active');
-                document.getElementById('preset-300').classList.remove('active');
-                document.getElementById('preset-600').classList.remove('active');
+            document.getElementById('preset-60').classList.remove('active');
+            document.getElementById('preset-300').classList.remove('active');
+            document.getElementById('preset-600').classList.remove('active');
+            
+            if (seconds == 60 || seconds == 300 || seconds == 600) {
                 document.getElementById('preset-' + seconds).classList.add('active');
             }
         }
 
-        // Rangni tanlash
         function setColor(color) {
             selectedColor = color;
             document.getElementById('color-white').classList.remove('active');
@@ -212,12 +199,43 @@
             document.getElementById('color-' + color).classList.add('active');
         }
 
-        // Tugma bosilganda ishga tushadigan asosiy funksiya
-        function generateGameLink() {
+        // ASOSIY API BOG'LANISH QISMI
+        async function generateGameLink() {
+            let creatorId = 123456; // Agar bot tashqarida ochilsa test uchun id
+
+            // Telegram Mini App foydalanuvchisining haqiqiy ID sini olamiz
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe.user) {
+                creatorId = window.Telegram.WebApp.initDataUnsafe.user.id;
+            }
+
             if (selectedMode === 'friend') {
-                alert(`Sozlamalar saqlandi!\nSiz tanlagan vaqt: ${currentTimeValue / 60} daqiqa\nDona rangi: ${selectedColor}\n\nTez orada API orqali havola yaratiladi.`);
+                try {
+                    // API yo'lagiga URL orqali ma'lumotlarni uzatamiz (Sizning backend formatingizga moslab)
+                    const url = `/api/game/create?creator_id=${creatorId}&time_limit=${currentTimeValue}&chosen_color=${selectedColor}`;
+                    
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        // Havolani muvaffaqiyatli olgach chiqariladigan xabar
+                        alert(`Muvaffaqiyatli! 🎉\n\nO'yin ID: ${data.game_id}\n${data.message}`);
+                        
+                        if (window.Telegram && window.Telegram.WebApp) {
+                            window.Telegram.WebApp.close(); // Ish bitgach Mini Appni yopish
+                        }
+                    } else {
+                        alert("Xatolik yuz berdi: " + data.detail);
+                    }
+                } catch (error) {
+                    alert("Server bilan bog'lanishda xatolik yuz berdi! ❌");
+                    console.error(error);
+                }
             } else {
-                alert("Tasodifiy raqib qidirilmoqda... Vaqt: 5 daqiqa, Rang: Random 🎲");
+                alert("Tasodifiy raqib qidirilmoqda... Tizim tez orada ishga tushadi! 🎲");
             }
         }
     </script>

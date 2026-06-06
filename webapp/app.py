@@ -38,11 +38,17 @@ def read_index(request: Request):
 @app.post("/api/game/create")
 def api_create_game(creator_id: int, time_limit: int, chosen_color: str, db: Session = Depends(get_db)):
     try:
+        # Ma'lumotlar bazasida o'yin yaratamiz
         game = create_custom_game(db, creator_id=creator_id, time_limit=time_limit, chosen_color=chosen_color)
+        
+        # O'yin havolasini bot manziliga moslab yasaymiz
+        game_url = f"https://t.me/UzChess_Match_bot/app?startapp=game_{game.id}"
+        
         return {
             "status": "success",
             "game_id": game.id,
-            "message": "O'yin muvaffaqiyatli yaratildi. Endi do'stingizga havola yuborishingiz mumkin!"
+            "game_url": game_url,
+            "message": "O'yin muvaffaqiyatli yaratildi! Havolani nusxalab do'stingizga yuboring."
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
