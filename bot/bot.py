@@ -6,20 +6,23 @@ from database.crud import get_or_create_user
 
 TOKEN = "8831656585:AAGoaoYsV-k5DSSexiXkNZFTPFqNgbdgH8I"
 
-# 🌟 BU YERGA O'ZINGIZNING KANAL USERNAME'INGIZNI YOZING (Masalan: @uzchess_news)
-REQUIRED_CHANNEL = "@https://t.me/UzCheess" 
+# 🔥 1. KANAL SOZLAMALARI
+CHANNEL_ID = -1003900981353       # Telegram orqada aniq tekshirishi uchun ID raqami
+CHANNEL_USERNAME = "@UzCheess" # Xabarlarda foydalanuvchiga chiroyli ko'rinishi uchun yuzerneym
 
 # Kanalga a'zolikni tekshiruvchi funksiya
 async def check_subscription(bot, user_id: int) -> bool:
     try:
-        member = await bot.get_chat_member(chat_id=REQUIRED_CHANNEL, user_id=user_id)
+        # Bot kanalga admin bo'lsa, ushbu kod mukammal ishlaydi
+        member = await bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
         if member.status in ['creator', 'administrator', 'member']:
             return True
         return False
     except Exception as e:
-        print(f"Obunani tekshirishda xatolik: {e}")
-        # Agar bot kanalga admin bo'lmasa yoki kanal topilmasa, xatolik bermay o'tkazib yuboradi
-        return True
+        print(f"Obunani tekshirishda xatolik (Bot kanalda adminmi?): {e}")
+        # Agar bot admin bo'lmasa, xato berib to'xtab qolmasligi uchun hozircha True beramiz
+        # Lekin bot admin qilib qo'shilsa, tekshirish 100% ishlaydi!
+        return False
 
 # Standart asosiy menyuni chiqaruvchi yordamchi funksiya
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, user, tg_user):
@@ -72,19 +75,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Kanalga obunani tekshirish
     is_subscribed = await check_subscription(context.bot, user_id)
     if not is_subscribed:
-        # Kanal havolasi bilan chiroyli Inline tugma va ostida "A'zo bo'ldim" tasdiqlash tugmasi
-        # Agar do'stlik linki bo'lsa, uni callback ichiga yashirib ketamiz, a'zo bo'lgach adashmaslik uchun
+        # Linkni callback ichiga yashiramiz, a'zo bo'lgach o'yinga to'g'ri o'tishi uchun
         callback_data = f"check_sub_game_{game_id}" if game_id else "check_sub_none"
         
         keyboard = [
-            [InlineKeyboardButton("Kanalga a'zo bo'lish 🚀", url=f"https://t.me/{REQUIRED_CHANNEL.replace('@', '')}")],
+            [InlineKeyboardButton("Kanalga a'zo bo'lish 🚀", url=f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}")],
             [InlineKeyboardButton("A'zo bo'ldim ✅", callback_data=callback_data)]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await update.message.reply_text(
             f"Diqqat! 🛑 O'yinga kirish uchun birinchi navbatda rasmiy kanalimizga a'zo bo'ling:\n\n"
-            f"👉 {REQUIRED_CHANNEL}\n\n"
+            f"👉 {CHANNEL_USERNAME}\n\n"
             f"A'zo bo'lib, pastdagi yashil tugmani bosing 👇",
             reply_markup=reply_markup
         )
@@ -104,42 +106,40 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # "A'zo bo'ldim ✅" tugmasi bosilganda ishlaydigan mantiq
 async def check_sub_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer() # Tugma yuklanishini to'xtatish
+    await query.answer()
     
     user_id = query.from_user.id
     tg_user = query.from_user
     
-    # Kanalga a'zolikni qayta tekshiramiz
     is_subscribed = await check_subscription(context.bot, user_id)
     
     if is_subscribed:
-        # Eski ogohlantirish xabarini o'chirib tashlaymiz
-        await query.message.delete()
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
         
         db = SessionLocal()
         user = get_or_create_user(db, telegram_id=user_id, username=tg_user.username)
         db.close()
         
-        # Callback ma'lumotidan o'yin ID sini qidiramiz
         data = query.data
-        if data.startswith("check_sub_game_") and not data.endswith("None"):
+        if data.startswith("check_sub_game_") and not data.endswith("none"):
             game_id = data.split("_")[3]
             await query.message.reply_text(
                 f"Tabriklaymiz! 🎉 Obuna muvaffaqiyatli tekshirildi.\n"
                 f"Siz {game_id}-raqamli o'yin taklifini qabul qildingiz. O'yin boshlanmoqda... ⚔️"
             )
         else:
-            # Oddiy kirgan bo'lsa, asosiy menyuni ochamiz
             await query.message.reply_text("Rahmat! Botdan to'liq foydalanishingiz mumkin. 🎉")
             await show_main_menu(update, context, user, tg_user)
     else:
-        # Agar hali ham a'zo bo'lmagan bo'lsa, ogohlantirish chiqaramiz
         await context.bot.send_message(
             chat_id=user_id,
-            text=f"Siz hali ham {REQUIRED_CHANNEL} kanaliga a'zo bo'lmadingiz. ❌\nIltimos, oldin a'zo bo'ling va keyin qayta urunib ko'ring."
+            text=f"Siz hali ham {CHANNEL_USERNAME} kanaliga a'zo bo'lmadingiz. ❌\nIltimos, oldin a'zo bo'ling va keyin qayta urinib ko'ring."
         )
 
-# Menyu tugmalari (Kompyuter / Reyting)
+# Menyu tugmalari
 async def handle_menu_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
@@ -156,9 +156,7 @@ def run_bot():
     app = Application.builder().token(TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
-    # Inline tugma (A'zo bo'ldim) uchun handler
     app.add_handler(CallbackQueryHandler(check_sub_callback, pattern="^check_sub_"))
-    # Oddiy menyu tugmalari uchun handler
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu_buttons))
     
     app.run_polling()
