@@ -2,244 +2,668 @@
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UzChess Match - O'yin Yaratish</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <meta property="og:title" content="UzChess Elite - O'ynaymizmi?">
+    <meta property="og:description" content="Do'stingiz sizni shaxmat jangiga chorlamoqda! Kiring va g'olib bo'ling.">
+    <meta property="og:image" content="https://images.unsplash.com/photo-1529699211952-734e80c4d42b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80">
+    <meta property="og:type" content="website">
+    
+    <title>UzChess Match ⚔️</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
+
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1a1a1a;
-            color: #ffffff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
+        :root { 
+            --gold: #ebd097; 
+            --bg: #121212; 
+            --dark-card: #1e1e1e; 
+            --green: #00d64f;
+            --red: #ff4d4d;
+            --blue-highlight: rgba(0, 195, 255, 0.6);
+            --blue-last: rgba(0, 195, 255, 0.5); 
         }
-        .container {
-            background-color: #262626;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-            text-align: center;
-            width: 90%;
-            max-width: 400px;
-        }
-        h2 { color: #f0d9b5; margin-bottom: 25px; }
-        
-        .section {
-            margin-bottom: 25px;
-            text-align: left;
-        }
-        label {
-            display: block;
-            margin-bottom: 10px;
-            font-size: 14px;
-            color: #ccc;
-        }
-        .time-presets, .color-selector, .mode-selector {
-            display: flex;
-            gap: 10px;
-        }
-        .preset-btn, .color-btn, .mode-btn {
-            flex: 1;
-            background-color: #333;
-            color: #fff;
-            border: 2px solid #444;
-            padding: 10px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: 0.2s;
-            font-size: 13px;
-        }
-        .preset-btn:hover, .color-btn:hover, .mode-btn:hover { 
-            background-color: #444; 
-            border-color: #f0d9b5; 
-        }
-        .color-btn.active, .preset-btn.active, .mode-btn.active { 
-            background-color: #f0d9b5; 
-            color: #1a1a1a; 
-            border-color: #b59963; 
-        }
-        
-        input[type=range] {
-            width: 100%;
-            margin: 10px 0;
-            accent-color: #f0d9b5;
-        }
-        
-        .create-game-btn {
-            width: 100%;
-            background-color: #81b64c;
-            color: white;
-            border: none;
-            padding: 14px;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(129, 182, 76, 0.3);
-            transition: 0.2s;
-            margin-top: 10px;
-        }
-        .create-game-btn:hover { background-color: #a3d16c; transform: translateY(-1px); }
-        
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
+        body { background-color: var(--bg); color: white; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        .screen { flex: 1; display: flex; flex-direction: column; align-items: center; width: 100%; position: relative; }
         .hidden { display: none !important; }
+
+        /* SETUP EKRANI */
+        #screen-setup { justify-content: center; padding: 20px; text-align: center; }
+        h2 { color: var(--gold); margin-bottom: 25px; text-shadow: 0 0 10px rgba(235, 208, 151, 0.3); }
+        
+        .setup-box { background: var(--dark-card); padding: 25px; border-radius: 15px; border: 1px solid #444; width: 90%; max-width: 380px; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+        .section { margin-bottom: 20px; text-align: left; }
+        label { display: block; margin-bottom: 10px; font-size: 14px; color: #ccc; }
+        
+        .time-presets, .color-selector { display: flex; gap: 10px; }
+        .preset-btn, .color-btn { flex: 1; background-color: #333; color: #fff; border: 2px solid #444; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; font-size: 13px; }
+        .preset-btn:hover, .color-btn:hover { background-color: #444; border-color: var(--gold); }
+        .color-btn.active, .preset-btn.active { background: linear-gradient(45deg, #b88a44, #ebd097); color: #1a1a1a; border-color: #b59963; }
+        
+        input[type=range] { -webkit-appearance: none; width: 100%; height: 15px; background: #333; outline: none; border-radius: 10px; margin: 15px 0; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 30px; height: 30px; border-radius: 50%; background: var(--gold); cursor: pointer; border: 2px solid white; }
+        
+        .create-game-btn { width: 100%; background: linear-gradient(45deg, #00d64f, #66ff99); color: black; border: none; padding: 15px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 214, 79, 0.3); transition: 0.2s; margin-top: 10px; }
+        .create-game-btn:hover { transform: translateY(-1px); }
+
+        /* GAME LIVE UI */
+        .player-info { width: 95%; max-width: 450px; display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: var(--dark-card); border-radius: 8px; margin: 5px 0; border: 1px solid #333; }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; background: #555; display: inline-block; margin-right: 6px; }
+        .status-dot.online { background: var(--green); box-shadow: 0 0 5px var(--green); }
+        
+        .clock { font-family: monospace; font-size: 1.5rem; padding: 5px 12px; background: #000; border: 1px solid #444; border-radius: 6px; color: #888; }
+        .clock.active { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 10px rgba(235, 208, 151, 0.2); }
+        
+        .board-wrapper { width: 98vw; max-width: 450px; aspect-ratio: 1/1; position: relative; margin: 5px 0; }
+        #myBoard { width: 100%; height: 100%; touch-action: none; }
+
+        /* HIGHLIGHTS FOR CHESSBOARD */
+        .highlight-move { box-shadow: inset 0 0 3px 3px var(--blue-highlight); background: rgba(0, 195, 255, 0.2); }
+        .highlight-active { background: rgba(235, 208, 151, 0.4); }
+        .highlight-last { background-color: var(--blue-last) !important; box-shadow: inset 0 0 5px rgba(255,255,255,0.5); }
+
+        /* MODALS */
+        .modal-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; display: flex; justify-content: center; align-items: center; border-radius: 10px; }
+        .modal-box { width: 85%; max-width: 320px; background: #1a1a1a; border: 1px solid var(--gold); border-radius: 15px; padding: 25px; text-align: center; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
+        .modal-box h3, .modal-box h2 { color: var(--gold); margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .info-row { display: flex; justify-content: space-between; margin: 10px 0; color: #ccc; font-size: 1.1rem; }
+        .info-row b { color: white; }
+        .anim-text { margin-top: 20px; color: #888; font-style: italic; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+        .go-icon { font-size: 4rem; margin: 20px 0; display: block; }
+        .win { color: var(--gold); text-shadow: 0 0 20px var(--gold); }
+        .lose { color: var(--red); text-shadow: 0 0 20px var(--red); }
+        .draw { color: #ccc; }
+
+        /* BOTTOM NAV */
+        .bottom-nav { width: 100%; padding: 10px; background: var(--dark-card); border-top: 1px solid #333; display: flex; gap: 8px; position: fixed; bottom: 0; left: 0; z-index: 500; }
+        .ctrl-btn { background: var(--dark-card); border: 1px solid var(--gold); color: var(--gold); padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.85rem; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; position: relative; }
+        .ctrl-btn:active { background: var(--gold); color: black; }
+        .ctrl-btn i { font-size: 1.2rem; }
+
+        .ctrl-btn.has-msg { border-color: var(--red); box-shadow: 0 0 10px rgba(255, 0, 0, 0.5); animation: flash 1s infinite; }
+        .ctrl-btn.has-msg::after { content: '!'; position: absolute; top: -5px; right: 5px; background: var(--red); color: white; width: 20px; height: 20px; border-radius: 50%; font-size: 0.9rem; line-height: 20px; text-align: center; border: 2px solid var(--dark-card); }
+        @keyframes flash { 0% { border-color: var(--gold); } 50% { border-color: var(--red); } 100% { border-color: var(--gold); } }
+
+        /* CHAT SIDEBAR */
+        #chat-sidebar { position: fixed; top: 0; right: -100%; width: 85%; max-width: 350px; height: 100%; background: #151515; z-index: 3000; transition: 0.3s; border-left: 2px solid var(--gold); display: flex; flex-direction: column; }
+        #chat-sidebar.open { right: 0; }
+        .chat-header { padding: 15px; background: #111; border-bottom: 1px solid var(--gold); display: flex; justify-content: space-between; align-items: center; }
+        .chat-msgs { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 8px; }
+        .msg { background: #333; padding: 8px 12px; border-radius: 8px; max-width: 90%; word-wrap: break-word; font-size: 0.95rem; text-align: left; }
+        .chat-footer { padding: 10px; background: #111; border-top: 1px solid #333; display: flex; gap: 10px; height: 70px; align-items: center; }
+        .chat-footer input { flex: 1; height: 45px; background: #222; border: 1px solid #444; color: white; padding: 0 15px; border-radius: 25px; font-size: 1rem; }
+        .chat-footer button { width: 45px; height: 45px; border-radius: 50%; background: var(--gold); border: none; font-weight: bold; font-size: 1.2rem; cursor: pointer; color: black; }
+
+        #toast { visibility: hidden; min-width: 250px; background-color: #222; color: var(--gold); text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 5000; left: 50%; transform: translateX(-50%); bottom: 100px; border: 1px solid var(--gold); font-size: 1rem; box-shadow: 0 0 15px black; }
+        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        @keyframes fadein { from {opacity: 0;} to {opacity: 1;} } @keyframes fadeout { from {opacity: 1;} to {opacity: 0;} }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h2>UzChess Match ⚔️</h2>
-        
-        <div class="section">
-            <label>O'yin Turini Tanlang:</label>
-            <div class="mode-selector">
-                <button type="button" class="mode-btn active" id="mode-friend" onclick="setMode('friend')">Do'st bilan ⚔️</button>
-                <button type="button" class="mode-btn" id="mode-random" onclick="setMode('random')">Tasodifiy Raqib 🎲</button>
-            </div>
-        </div>
+    <div id="toast">Xabar</div>
+    <div class="modal-overlay" id="overlay" style="display:none;" onclick="toggleChat(false)"></div>
 
-        <div id="friend-settings-block">
+    <div id="screen-setup" class="screen">
+        <div class="setup-box">
+            <h2>UzChess Match ⚔️</h2>
+            
             <div class="section">
                 <label>Standart Vaqtni Tanlang:</label>
                 <div class="time-presets">
-                    <button type="button" class="preset-btn" id="preset-60" onclick="setPreset(60)">1 daq</button>
-                    <button type="button" class="preset-btn active" id="preset-300" onclick="setPreset(300)">5 daq</button>
-                    <button type="button" class="preset-btn" id="preset-600" onclick="setPreset(600)">10 daq</button>
+                    <button type="button" class="preset-btn" onclick="updateTime(1)">1 daq</button>
+                    <button type="button" class="preset-btn active" id="preset-default" onclick="updateTime(10)">10 daq</button>
+                    <button type="button" class="preset-btn" onclick="updateTime(20)">20 daq</button>
                 </div>
             </div>
 
             <div class="section">
-                <label>Yoki mustaqil vaqt belgilang: <span id="time-display" style="color: #f0d9b5; font-weight: bold;">5 daqiqa</span></label>
-                <input type="range" id="time-slider" min="60" max="1800" step="60" value="300" oninput="updateSliderDisplay(this.value)">
-                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #aaa;">
-                    <span>1 daq</span>
-                    <span>30 daq</span>
-                </div>
+                <label>Yoki mustaqil vaqt belgilang: <span id="time-val" style="color: var(--gold); font-weight: bold;">10</span> daqiqa</label>
+                <input type="range" min="1" max="60" value="10" id="time-slider" oninput="updateTime(this.value)">
             </div>
 
             <div class="section">
                 <label>Dona Rangini Tanlang:</label>
                 <div class="color-selector">
-                    <button type="button" class="color-btn active" id="color-white" onclick="setColor('white')">Oq 🏳️</button>
-                    <button type="button" class="color-btn" id="color-random" onclick="setColor('random')">Ixtiyoriy 🎲</button>
-                    <button type="button" class="color-btn" id="color-black" onclick="setColor('black')">Qora 🏴</button>
+                    <button type="button" class="color-btn active" id="c-w" onclick="setPref('color', 'w')">Oq 🏳️</button>
+                    <button type="button" class="color-btn" id="c-b" onclick="setPref('color', 'b')">Qora 🏴</button>
+                </div>
+            </div>
+
+            <button class="create-game-btn" onclick="createGame()">Do'stni taklif qilish ✉️</button>
+        </div>
+    </div>
+
+    <div id="screen-game" class="screen hidden" style="justify-content:flex-start; padding-top:10px;">
+        <div class="player-info">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span id="dot-top" class="status-dot"></span>
+                <span id="name-top" style="color:#ccc; font-weight:bold;">Raqib</span>
+            </div>
+            <div id="clock-top" class="clock">00:00</div>
+        </div>
+
+        <div class="board-wrapper">
+            <div id="myBoard"></div>
+
+            <div id="modal-waiting" class="modal-overlay" style="display:none; position:absolute;">
+                <div class="modal-box">
+                    <h3>Raqib Kutilmoqda...</h3>
+                    <div class="info-row"><span>Vaqt:</span> <b id="wait-time">10 min</b></div>
+                    <div class="info-row"><span>Siz:</span> <b id="wait-color">Oq</b></div>
+                    <div class="anim-text">Linkni do'stingizga yuboring</div>
+                    <button class="create-game-btn" style="margin-top:20px; font-size:1rem; padding:12px;" onclick="shareLink()">🔗 Havolani Ulashish</button>
+                </div>
+            </div>
+
+            <div id="modal-join" class="modal-overlay" style="display:none; position:absolute;">
+                <div class="modal-box">
+                    <h3>O'yin Taklifi!</h3>
+                    <div class="info-row"><span>Raqib:</span> <b id="join-opp">Do'stingiz</b></div>
+                    <div class="info-row"><span>Vaqt:</span> <b id="join-time">10 min</b></div>
+                    <div class="info-row"><span>Siz:</span> <b id="join-color">Qora</b></div>
+                    <div style="margin-top:20px; display:flex; gap:10px;">
+                        <button class="create-game-btn" style="background:#00d64f; color:black;" onclick="acceptGame()">✅ O'ynash</button>
+                        <button class="create-game-btn" style="background:#ff4d4d; color:white;" onclick="goHome()">❌ Yo'q</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="modal-gameover" class="modal-overlay" style="display:none; position:absolute;">
+                <div class="modal-box">
+                    <h2 id="go-title" style="margin-bottom:10px;">O'yin tugadi</h2>
+                    <i id="go-icon" class="fas fa-trophy go-icon win"></i>
+                    <p id="go-msg" style="color:#ccc; margin-bottom:20px; font-size:1.1rem;"></p>
+                    <button class="create-game-btn" onclick="rematch()">DAVOM ETISH ↻</button>
                 </div>
             </div>
         </div>
 
-        <div id="random-settings-block" class="hidden">
-            <p style="font-size: 14px; color: #aaa; text-align: left; line-height: 1.5;">
-                * Tasodifiy o'yin rejimida tizim sizga mos reytingdagi raqibni avtomat qidiradi. Vaqt standart 5 daqiqa etib belgilanadi va dona ranglari o'yin boshlanganda tasodifiy (random) taqsimlanadi.
-            </p>
+        <div class="player-info">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="status-dot online"></span>
+                <span id="name-bottom" style="font-weight:bold; color:white;">Siz</span>
+            </div>
+            <div id="clock-bottom" class="clock">00:00</div>
         </div>
 
-        <button class="create-game-btn" id="action-btn" onclick="generateGameLink()">Do'stni taklif qilish ✉️</button>
+        <div class="bottom-nav">
+            <button id="chat-btn" class="ctrl-btn" onclick="toggleChat(true)"><i class="fas fa-comment-dots"></i> Chat</button>
+            <button class="ctrl-btn" onclick="gameAction('resign')"><i class="fas fa-flag"></i> Taslim</button>
+            <button class="ctrl-btn" onclick="gameAction('draw')"><i class="fas fa-handshake"></i> Durrang</button>
+            <button class="ctrl-btn" style="border-color:#555; color:#aaa;" onclick="goHome()"><i class="fas fa-home"></i> Chiqish</button>
+        </div>
+    </div>
+
+    <div id="chat-sidebar">
+        <div class="chat-header">
+            <b style="color:var(--gold); font-size:1.2rem;">O'yin Chati</b>
+            <span onclick="toggleChat(false)" style="cursor:pointer; font-size:1.5rem;">✕</span>
+        </div>
+        <div id="chat-msgs" class="chat-msgs"></div>
+        <div class="chat-footer">
+            <input type="text" id="chat-in" placeholder="Xabar yozing...">
+            <button onclick="sendChat()">➤</button>
+        </div>
     </div>
 
     <script>
-        let selectedMode = 'friend';
-        let selectedColor = 'white';
-        let currentTimeValue = 300; 
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        
+        // ⚠️ DYNAMIC BOT USERNAME: Avtomatik botizni aniqlaydi!
+        let botUsername = "UzCheess_bot"; 
 
-        if (window.Telegram && window.Telegram.WebApp) {
-            window.Telegram.WebApp.ready();
-            window.Telegram.WebApp.expand();
-        }
-
-        function setMode(mode) {
-            selectedMode = mode;
-            document.getElementById('mode-friend').classList.remove('active');
-            document.getElementById('mode-random').classList.remove('active');
-            document.getElementById('mode-' + mode).classList.add('active');
-
-            const friendBlock = document.getElementById('friend-settings-block');
-            const randomBlock = document.getElementById('random-settings-block');
-            const actionBtn = document.getElementById('action-btn');
-
-            if (mode === 'friend') {
-                friendBlock.classList.remove('hidden');
-                randomBlock.classList.add('hidden');
-                actionBtn.innerText = "Do'stni taklif qilish ✉️";
+        let user = tg.initDataUnsafe?.user || { id: null, first_name: 'Farruxbek' };
+        if(!user.id) {
+            if(localStorage.getItem('uzchess_uid')) {
+                user.id = localStorage.getItem('uzchess_uid');
+                user.first_name = localStorage.getItem('uzchess_name') || "Farruxbek";
             } else {
-                friendBlock.classList.add('hidden');
-                randomBlock.classList.remove('hidden');
-                actionBtn.innerText = "Raqib qidirishni boshlash 🔍";
+                user.id = 'u_' + Date.now();
+                user.first_name = "Farruxbek";
+                localStorage.setItem('uzchess_uid', user.id);
+                localStorage.setItem('uzchess_name', user.first_name);
+            }
+        }
+        $('#name-bottom').text(user.first_name);
+
+        // Firebase Konfiguratsiyasi (Sizning ma'lumotlar bazangiz)
+        const firebaseConfig = {
+            apiKey: "AIzaSyBZZSWMTNf0Jp80ndxrss-E2eASQCl6SWI",
+            authDomain: "uzchess-579b9.firebaseapp.com",
+            databaseURL: "https://uzchess-579b9-default-rtdb.firebaseio.com",
+            projectId: "uzchess-579b9",
+            storageBucket: "uzchess-579b9.firebasestorage.app",
+            messagingSenderId: "317369640428",
+            appId: "1:317369640428:web:dd5b9e62b35c7036770cc9"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let game = new Chess();
+        let board = null;
+        
+        // 🔥 TELEGRAM STARTAPP TIZIMI: Agar havola orqali kirsa to'g'ridan-to'g'ri o'yin ID sini oʻqiydi!
+        let gameId = tg.initDataUnsafe?.start_param || new URLSearchParams(window.location.search).get('g');
+        
+        let myColor = 'w';
+        let prefs = { color: 'w', time: 10 };
+        let timerInt = null;
+        let selectedSquare = null;
+        
+        let p1_id_cached = null;
+        let creatorColor_cached = null;
+        let initialTime_cached = 600;
+        let isChatOpen = false;
+
+        // Tovush effektlari havolalari
+        const sounds = {
+            start: new Audio('https://raw.githubusercontent.com/lichess-org/lila/master/public/sound/standard/GenericNotify.mp3'),
+            move: new Audio('https://raw.githubusercontent.com/lichess-org/lila/master/public/sound/standard/Move.mp3'),
+            capture: new Audio('https://raw.githubusercontent.com/lichess-org/lila/master/public/sound/standard/Capture.mp3'),
+            check: new Audio('https://raw.githubusercontent.com/lichess-org/lila/master/public/sound/standard/GenericNotify.mp3'),
+            win: new Audio('https://raw.githubusercontent.com/lichess-org/lila/master/public/sound/standard/Victory.mp3'),
+            lose: new Audio('https://raw.githubusercontent.com/lichess-org/lila/master/public/sound/standard/Defeat.mp3'),
+            notify: new Audio('https://raw.githubusercontent.com/lichess-org/lila/master/public/sound/standard/GenericNotify.mp3')
+        };
+
+        let audioUnlocked = false;
+        function unlockAudio() {
+            if(audioUnlocked) return;
+            Object.values(sounds).forEach(s => {
+                s.muted = true; s.play().catch(()=>{}); s.pause(); s.currentTime=0; s.muted=false;
+            });
+            audioUnlocked = true;
+            document.removeEventListener('click', unlockAudio);
+            document.removeEventListener('touchstart', unlockAudio);
+        }
+        document.addEventListener('click', unlockAudio);
+        document.addEventListener('touchstart', unlockAudio);
+
+        function playSound(name) {
+            try { if(sounds[name]) { sounds[name].currentTime=0; sounds[name].play().catch(()=>{}); } } catch(e){}
+        }
+
+        function highlightLastMove(from, to) {
+            $('.square-55d63').removeClass('highlight-last');
+            if (from && to) {
+                $('.square-' + from).addClass('highlight-last');
+                $('.square-' + to).addClass('highlight-last');
             }
         }
 
-        function setPreset(seconds) {
-            currentTimeValue = seconds;
-            document.getElementById('time-slider').value = seconds;
-            updateSliderDisplay(seconds);
+        function goHome() {
+            $('.screen').addClass('hidden'); $('#screen-setup').removeClass('hidden');
+            if(gameId && myColor) db.ref(`games/${gameId}/${myColor==='w'?'p1_online':'p2_online'}`).set(false);
+            gameId = null; 
         }
 
-        function updateSliderDisplay(seconds) {
-            currentTimeValue = parseInt(seconds);
-            const minutes = currentTimeValue / 60;
-            document.getElementById('time-display').innerText = minutes + " daqiqa";
+        function setPref(k,v) { 
+            prefs[k]=v; 
+            if(k==='color'){
+                $('.color-btn').removeClass('active');
+                $('#c-'+v).addClass('active');
+            } 
+        }
+
+        function updateTime(v) { 
+            prefs.time=parseInt(v); 
+            $('#time-val').text(v); 
+            $('#time-slider').value = v;
+            $('.preset-btn').removeClass('active');
+        }
+        
+        function toggleChat(show) { 
+            isChatOpen = show;
+            if(show) {
+                $('#chat-sidebar').addClass('open'); 
+                $('#chat-btn').removeClass('has-msg'); 
+            } else {
+                $('#chat-sidebar').removeClass('open');
+            }
+        }
+
+        // --- O'YIN YARATISH LOGIKASI ---
+        function createGame() {
+            gameId = Math.random().toString(36).substring(2, 9);
+            localStorage.setItem('uzchess_last_game_id', gameId);
             
-            document.getElementById('preset-60').classList.remove('active');
-            document.getElementById('preset-300').classList.remove('active');
-            document.getElementById('preset-600').classList.remove('active');
+            const d = {
+                fen: 'start', turn: 'w',
+                initialTime: prefs.time*60, wTime: prefs.time*60, bTime: prefs.time*60,
+                creatorColor: prefs.color, 
+                p1_name: user.first_name, p1_id: user.id, p1_online: true,
+                status: 'waiting'
+            };
+            db.ref('games/'+gameId).set(d).then(()=>{
+                myColor = prefs.color;
+                initBoard(true);
+            });
+        }
+
+        // --- MUKAMMAL DO'STGA YUBORILADIGAN LINK GENERATORI ---
+        function shareLink() {
+            const tgLink = `https://t.me/${botUsername}/app?startapp=${gameId}`;
+            const inviteText = encodeURIComponent(`Men bilan UzChess'da kuch sinash! ⚔️\nVaqt: ${prefs.time} daqiqa.`);
+            const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(tgLink)}&text=${inviteText}`;
             
-            if (seconds == 60 || seconds == 300 || seconds == 600) {
-                document.getElementById('preset-' + seconds).classList.add('active');
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.openTelegramLink(shareUrl);
+            } else {
+                navigator.clipboard.writeText(tgLink);
+                showToast("O'yin havolasi nusxalandi!");
             }
         }
 
-        function setColor(color) {
-            selectedColor = color;
-            document.getElementById('color-white').classList.remove('active');
-            document.getElementById('color-random').classList.remove('active');
-            document.getElementById('color-black').classList.remove('active');
-            document.getElementById('color-' + color).classList.add('active');
+        function loadGame(gid) {
+            db.ref('games/'+gid).once('value', s=>{
+                const d = s.val();
+                if(!d) { showToast("O'yin topilmadi!"); goHome(); return; }
+
+                if(d.p1_id == user.id) {
+                    myColor = d.creatorColor;
+                    initBoard(d.status==='waiting');
+                }
+                else if(d.p2_id == user.id) {
+                    myColor = (d.creatorColor==='w'?'b':'w');
+                    initBoard(false);
+                }
+                else if(!d.p2_id) {
+                    $('#join-opp').text(d.p1_name);
+                    $('#join-time').text((d.initialTime/60)+" min");
+                    let hisC = d.creatorColor;
+                    $('#join-color').text(hisC==='w' ? "Qora" : "Oq");
+                    $('.screen').addClass('hidden'); $('#screen-game').removeClass('hidden');
+                    $('#modal-join').show();
+                } 
+                else { showToast("O'yin to'la!"); goHome(); }
+            });
         }
 
-        async function generateGameLink() {
-            let creatorId = 123456; 
-            let creatorName = "O'yinchi";
+        function acceptGame() {
+            localStorage.setItem('uzchess_last_game_id', gameId);
+            $('#modal-join').hide();
+            db.ref('games/'+gameId).once('value', s=>{
+                const d = s.val();
+                myColor = (d.creatorColor==='w'?'b':'w'); 
+                db.ref('games/'+gameId).update({
+                    p2_name: user.first_name, p2_id: user.id, status: 'playing', p2_online: true
+                });
+                initBoard(false);
+            });
+        }
 
-            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe.user) {
-                creatorId = window.Telegram.WebApp.initDataUnsafe.user.id;
-                creatorName = window.Telegram.WebApp.initDataUnsafe.user.first_name;
+        function initBoard(isWaiting) {
+            $('.screen').addClass('hidden'); $('#screen-game').removeClass('hidden');
+            $('#wait-time').text(prefs.time+" min");
+            $('#wait-color').text(myColor==='w'?"Oq":"Qora");
+            
+            if(isWaiting) $('#modal-waiting').show(); else $('#modal-waiting').hide();
+            $('#modal-join').hide();
+            $('#modal-gameover').hide();
+
+            game = new Chess();
+            if(board) board.destroy();
+            board = ChessBoard('myBoard', {
+                draggable: false,
+                position: 'start',
+                orientation: myColor==='w'?'white':'black',
+                pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+            });
+
+            $('#myBoard').off('click').on('click', '.square-55d63', handleSquareClick);
+            if(gameId) listenGame();
+        }
+
+        function handleSquareClick() {
+            if (game.turn() !== myColor.charAt(0)) return; 
+            
+            const sq = $(this).attr('data-square');
+            const p = game.get(sq);
+            if(!selectedSquare) {
+                if(p && p.color===game.turn()) { selectedSquare=sq; highlight(sq); }
+                return;
             }
+            if(selectedSquare===sq) { clearHi(); selectedSquare=null; return; }
+            if(p && p.color===game.turn()) { selectedSquare=sq; highlight(sq); return; }
 
-            if (selectedMode === 'friend') {
-                try {
-                    const url = `/api/game/create?creator_id=${creatorId}&time_limit=${currentTimeValue}&chosen_color=${selectedColor}`;
-                    
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' }
-                    });
+            const m = game.move({from:selectedSquare, to:sq, promotion:'q'});
+            if(m) {
+                if (game.in_check()) playSound('check');
+                else if (m.flags.includes('c') || m.flags.includes('e')) playSound('capture');
+                else playSound('move');
 
-                    const data = await response.json();
+                highlightLastMove(selectedSquare, sq);
 
-                    if (response.ok) {
-                        // Chiroyli taklifnoma matni tayyorlaymiz
-                        const inviteText = encodeURIComponent(`Salom! Men bilan shaxmat o'ynaysizmi? ⚔️\n⏱ Vaqt: ${currentTimeValue / 60} daqiqa\n🎨 Rangim: ${selectedColor === 'white' ? 'Oq 🏳️' : selectedColor === 'black' ? 'Qora 🏴' : 'Ixtiyoriy 🎲'}`);
-                        
-                        // Telegramning ichki ulashish (Share) havolasini ochamiz. Bu to'g'ridan-to'g'ri kontaktlarni ochadi!
-                        const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(data.game_url)}&text=${inviteText}`;
-                        
-                        if (window.Telegram && window.Telegram.WebApp) {
-                            window.Telegram.WebApp.openTelegramLink(shareUrl);
-                        } else {
-                            window.open(shareUrl, '_blank');
-                        }
-                    } else {
-                        alert("Xatolik yuz berdi: " + data.detail);
+                let updateData = {
+                    fen: game.fen(), 
+                    turn: game.turn(),
+                    lastMove: { from: selectedSquare, to: sq }
+                };
+                if (game.in_checkmate()) updateData.status = 'checkmate'; 
+                
+                db.ref('games/'+gameId).update(updateData);
+                board.position(game.fen());
+                clearHi(); selectedSquare=null;
+            } else { clearHi(); selectedSquare=null; }
+        }
+        
+        function highlight(sq) {
+            clearHi(); $('.square-'+sq).addClass('highlight-active');
+            game.moves({square:sq, verbose:true}).forEach(m=>$('.square-'+m.to).addClass('highlight-move'));
+        }
+        function clearHi() { $('.square-55d63').removeClass('highlight-active highlight-move'); }
+
+        let prevFen = "start";
+
+        function listenGame() {
+            const con = db.ref(`games/${gameId}/${myColor==='w'?'p1_online':'p2_online'}`);
+            con.set(true); con.onDisconnect().set(false);
+
+            db.ref('games/'+gameId).on('value', s=>{
+                const d = s.val();
+                if(!d) return;
+
+                p1_id_cached = d.p1_id;
+                creatorColor_cached = d.creatorColor;
+                initialTime_cached = d.initialTime;
+
+                let correctColor = (d.p1_id == user.id) ? d.creatorColor : (d.creatorColor==='w'?'b':'w');
+                if(myColor !== correctColor) {
+                    myColor = correctColor;
+                    board.orientation(myColor==='w'?'white':'black');
+                }
+
+                if(d.status==='playing') {
+                    if ($('#modal-waiting').is(':visible')) playSound('start');
+                    $('#modal-waiting').fadeOut();
+                    $('#modal-gameover').fadeOut();
+                }
+
+                if (d.fen === 'start' || d.fen.startsWith("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")) {
+                    if (game.history().length > 0 || game.fen() !== "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {
+                         game = new Chess(); 
+                         board.position('start');
+                         clearHi();
+                         highlightLastMove(null, null);
+                         prevFen = "start";
                     }
-                } catch (error) {
-                    alert("Server bilan bog'lanishda xatolik yuz berdi! ❌");
-                    console.error(error);
+                } 
+                else if(d.fen !== game.fen()) {
+                    if (game.turn() !== myColor.charAt(0)) {
+                         let tempGame = new Chess(prevFen);
+                         game.load(d.fen);
+                         board.position(d.fen);
+                         
+                         if (d.lastMove) highlightLastMove(d.lastMove.from, d.lastMove.to);
+
+                         if(game.in_check()) playSound('check');
+                         else {
+                             let piecesBefore = tempGame.fen().split(' ')[0].replace(/[^a-z]/gi, '').length;
+                             let piecesAfter = game.fen().split(' ')[0].replace(/[^a-z]/gi, '').length;
+                             if(piecesAfter < piecesBefore) playSound('capture');
+                             else playSound('move');
+                         }
+                    } else {
+                         game.load(d.fen);
+                         board.position(d.fen);
+                         if (d.lastMove) highlightLastMove(d.lastMove.from, d.lastMove.to);
+                    }
+                    clearHi();
+                }
+                prevFen = d.fen;
+
+                updateClocks(d);
+                
+                const isP1 = (user.id == d.p1_id);
+                $('#name-top').text(isP1 ? (d.p2_name||"Kutilmoqda") : d.p1_name);
+                let oppOn = isP1 ? d.p2_online : d.p1_online;
+                $('#dot-top').attr('class', 'status-dot '+(oppOn?'online':''));
+
+                if(d.status!=='playing' && d.status!=='waiting' && d.status!=='draw_offer') {
+                    if(!window.endAlert) {
+                        window.endAlert = true;
+                        
+                        let title = "O'yin tugadi";
+                        let msg = "";
+                        let icon = "fas fa-flag";
+                        let cls = "draw";
+                        let winner = null; 
+                        
+                        if(d.status.includes('resign_w')) winner = 'b';
+                        else if(d.status.includes('resign_b')) winner = 'w';
+                        else if(d.status === 'checkmate') winner = (d.turn === 'w' ? 'b' : 'w');
+                        else if(d.status === 'timeout') winner = (d.turn === 'w' ? 'b' : 'w');
+
+                        if(d.status === 'draw') {
+                            title = "Durrang!"; icon = "fas fa-handshake"; cls = "draw"; msg = "Tomonlar kelishib oldi";
+                            playSound('notify');
+                        } 
+                        else if(winner) {
+                            if(winner === myColor.charAt(0)) {
+                                title = "G'alaba!"; icon = "fas fa-trophy"; cls = "win"; msg = "Tabriklaymiz, siz yutdingiz!";
+                                playSound('win');
+                            } else {
+                                title = "Mag'lubiyat..."; icon = "fas fa-skull"; cls = "lose"; msg = "Afsuski, siz yutqazdingiz.";
+                                playSound('lose');
+                            }
+                        }
+
+                        $('#go-title').text(title);
+                        $('#go-msg').text(msg);
+                        $('#go-icon').attr('class', `go-icon ${icon} ${cls}`);
+                        $('#modal-gameover').fadeIn();
+                    }
+                } else { if(d.status==='playing') window.endAlert=false; }
+
+                if(d.drawOffer && d.drawOffer!==myColor && !window.drawAsked) {
+                    window.drawAsked=true;
+                    playSound('notify');
+                    if(confirm("Durrang taklif qilindi. Rozimisiz?")) db.ref('games/'+gameId).update({status:'draw', drawOffer:null});
+                    else db.ref('games/'+gameId).update({drawOffer:null});
+                    setTimeout(()=>{window.drawAsked=false},1000);
+                }
+            });
+
+            db.ref('chats/'+gameId).off('child_added');
+            db.ref('chats/'+gameId).on('child_added', s=>{
+                const m=s.val();
+                $('#chat-msgs').append(`<div class="msg"><b>${m.u}:</b> ${m.t}</div>`);
+                document.getElementById('chat-msgs').scrollTop=99999;
+                if(!isChatOpen && m.u !== user.first_name) {
+                    playSound('notify');
+                    $('#chat-btn').addClass('has-msg'); 
+                }
+            });
+        }
+
+        function rematch() {
+            $('#modal-gameover').hide();
+            if(user.id == p1_id_cached) {
+                let newC = creatorColor_cached==='w'?'b':'w';
+                db.ref('games/'+gameId).update({
+                    fen:'start', turn:'w', status:'playing',
+                    wTime:initialTime_cached, bTime:initialTime_cached,
+                    creatorColor: newC, 
+                    drawOffer: null,
+                    lastMove: null 
+                });
+            } else {
+                showToast("Xost yangi o'yin boshlashini kuting...");
+            }
+        }
+
+        function updateClocks(d) {
+            const fmt=s=>{let m=Math.floor(s/60),x=Math.floor(s%60);return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;};
+            if(myColor==='w') {
+                $('#clock-bottom').text(fmt(d.wTime)).toggleClass('active', d.turn==='w');
+                $('#clock-top').text(fmt(d.bTime)).toggleClass('active', d.turn==='b');
+            } else {
+                $('#clock-bottom').text(fmt(d.bTime)).toggleClass('active', d.turn==='b');
+                $('#clock-top').text(fmt(d.wTime)).toggleClass('active', d.turn==='w');
+            }
+            
+            if(d.status==='playing' && user.id==d.p1_id) {
+                if(!timerInt) {
+                    timerInt = setInterval(()=>{
+                        db.ref('games/'+gameId).once('value', snapshot=>{
+                            const gd=snapshot.val();
+                            if(!gd || gd.status!=='playing') { clearInterval(timerInt); timerInt=null; return; }
+                            let updates={};
+                            if(gd.turn==='w') {
+                                updates.wTime = Math.max(0, gd.wTime - 1);
+                                if(updates.wTime===0) updates.status='timeout';
+                            } else {
+                                updates.bTime = Math.max(0, gd.bTime - 1);
+                                if(updates.bTime===0) updates.status='timeout';
+                            }
+                            if(Object.keys(updates).length > 0) db.ref('games/'+gameId).update(updates);
+                        });
+                    }, 1000);
                 }
             } else {
-                alert("Tasodifiy raqib qidirilmoqda... Tizim tez orada ishga tushadi! 🎲");
+                if(timerInt) { clearInterval(timerInt); timerInt=null; }
             }
+        }
+
+        function gameAction(action) {
+            if (!gameId) return;
+            if (action === 'resign') {
+                if (confirm("Haqiqatdan ham taslim bo'lmoqchimisiz?")) {
+                    db.ref('games/' + gameId).update({ status: 'resign_' + myColor });
+                }
+            } else if (action === 'draw') {
+                showToast("Durrang taklifi yuborildi...");
+                db.ref('games/' + gameId).update({ drawOffer: myColor });
+            }
+        }
+
+        function sendChat() {
+            const msg = $('#chat-in').val().trim();
+            if (!msg || !gameId) return;
+            db.ref('chats/' + gameId).push({ u: user.first_name, t: msg });
+            $('#chat-in').val('');
+        }
+
+        function showToast(t) { let e=document.getElementById('toast'); e.innerText=t; e.className="show"; setTimeout(()=>{e.className=""},3000); }
+
+        $('#chat-in').on('keypress', function(e) { if (e.which === 13) sendChat(); });
+
+        // 🔥 STRATEGIK LOAD TIZIMI
+        if (gameId) { 
+            loadGame(gameId); 
         }
     </script>
 </body>
