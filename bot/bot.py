@@ -4,7 +4,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from database.database import SessionLocal
 from database.crud import get_or_create_user
 
-TOKEN = "8831656585:AAGoaoYsV-k5DSSexiXkNZFTPFqNgbdgH8I"
+TOKEN = "8831656585:AAE8yeqGju6sZJopRcNWVJJqoTdLDf4Jl6U"
 
 # 🔥 1. KANAL SOZLAMALARI
 CHANNEL_ID = -1003900981353       # Telegram orqada aniq tekshirishi uchun ID raqami
