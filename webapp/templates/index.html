@@ -159,7 +159,7 @@
                     <div class="info-row"><span>Vaqt:</span> <b id="wait-time">10 min</b></div>
                     <div class="info-row"><span>Siz:</span> <b id="wait-color">Oq</b></div>
                     <div class="anim-text">Linkni do'stingizga yuboring</div>
-                    <button class="btn-gold" style="margin-top:20px; font-size:1rem; padding:12px;" onclick="shareLink()">🔗 Linkni Ulashish</button>
+                    <button class="btn-gold" style="margin-top:20px; font-size:1rem; padding:12px;" id="share-link-btn">🔗 Linkni Ulashish</button>
                 </div>
             </div>
 
@@ -190,7 +190,7 @@
                     <h2 id="go-title" style="margin-bottom:10px;">O'yin tugadi</h2>
                     <i id="go-icon" class="fas fa-trophy go-icon win"></i>
                     <p id="go-msg" style="color:#ccc; margin-bottom:20px; font-size:1.1rem;"></p>
-                    <button class="btn-gold" id="rematch-btn" onclick="rematch()">DAVOM ETISH ↻</button>
+                    <button class="btn-gold" id="rematch-btn" onclick="goHome()">BOSH MENYU ↻</button>
                 </div>
             </div>
         </div>
@@ -227,15 +227,15 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
         
-        let botUsername = "UzCheess_bot"; // G'olibona va to'g'ri bot username
-
+        let globalGameUrl = ""; 
         let user = tg.initDataUnsafe?.user || { id: null, first_name: 'Mehmon' };
+        
         if(!user.id) {
             if(localStorage.getItem('uzchess_uid')) {
-                user.id = localStorage.getItem('uzchess_uid');
+                user.id = parseInt(localStorage.getItem('uzchess_uid'));
                 user.first_name = localStorage.getItem('uzchess_name') || "Mehmon";
             } else {
-                user.id = 'u_' + Date.now() + Math.floor(Math.random()*1000);
+                user.id = Math.floor(100000 + Math.random() * 900000);
                 user.first_name = prompt("Ismingiz?") || "Mehmon";
                 localStorage.setItem('uzchess_uid', user.id);
                 localStorage.setItem('uzchess_name', user.first_name);
@@ -243,6 +243,7 @@
         }
         $('#name-bottom').text(user.first_name);
 
+        // Firebase Realtime Database konfiguratsiyasi
         const firebaseConfig = {
             apiKey: "AIzaSyBZZSWMTNf0Jp80ndxrss-E2eASQCl6SWI",
             authDomain: "uzchess-579b9.firebaseapp.com",
@@ -257,7 +258,7 @@
 
         let game = new Chess();
         let board = null;
-        let isBotMode = false; // Botga qarshi rejim flagi
+        let isBotMode = false;
         
         let gameId = tg.initDataUnsafe?.start_param || new URLSearchParams(window.location.search).get('g');
         
@@ -265,13 +266,8 @@
         let prefs = { color: 'w', time: 10 };
         let timerInt = null;
         let selectedSquare = null;
-        
-        let p1_id_cached = null;
-        let creatorColor_cached = null;
-        let initialTime_cached = 600;
         let isChatOpen = false;
 
-        // Oflayn bot yoki do'st rejimi vaqtlari uchun
         let botWTime = 600, botBTime = 600;
 
         const sounds = {
@@ -283,19 +279,6 @@
             lose: new Audio('https://raw.githubusercontent.com/lichess-org/lila/master/public/sound/standard/Defeat.mp3'),
             notify: new Audio('https://raw.githubusercontent.com/lichess-org/lila/master/public/sound/standard/GenericNotify.mp3')
         };
-
-        let audioUnlocked = false;
-        function unlockAudio() {
-            if(audioUnlocked) return;
-            Object.values(sounds).forEach(s => {
-                s.muted = true; s.play().catch(()=>{}); s.pause(); s.currentTime=0; s.muted=false;
-            });
-            audioUnlocked = true;
-            document.removeEventListener('click', unlockAudio);
-            document.removeEventListener('touchstart', unlockAudio);
-        }
-        document.addEventListener('click', unlockAudio);
-        document.addEventListener('touchstart', unlockAudio);
 
         function playSound(name) {
             try { if(sounds[name]) { sounds[name].currentTime=0; sounds[name].play().catch(()=>{}); } } catch(e){}
@@ -347,26 +330,57 @@
             }
         }
 
-        // --- DO'ST BILAN O'YIN YARATISH MANTIG'I ---
+        // --- 🔥 DO'ST BILAN O'YIN YARATISH: APIdan foydalanamiz! ---
         function createGame() {
-            gameId = Math.random().toString(36).substring(2, 9);
-            localStorage.setItem('uzchess_last_game_id', gameId);
             isBotMode = false;
-            
-            const d = {
-                fen: 'start', turn: 'w',
-                initialTime: prefs.time*60, wTime: prefs.time*60, bTime: prefs.time*60,
-                creatorColor: prefs.color, 
-                p1_name: user.first_name, p1_id: user.id, p1_online: true,
-                status: 'waiting'
-            };
-            db.ref('games/'+gameId).set(d).then(()=>{
-                myColor = prefs.color;
-                initBoard(true); // O'yin maydonini ochish va kutish modalini yoqish
+            showToast("O'yin xonasi yaratilmoqda...");
+
+            // Biz yaratgan FastAPI POST so'rovini chaqiramiz
+            $.ajax({
+                url: `/api/game/create?creator_id=${user.id}&time_limit=${prefs.time}&chosen_color=${prefs.color}`,
+                type: 'POST',
+                success: function(response) {
+                    if(response.status === 'success') {
+                        gameId = response.game_id;
+                        globalGameUrl = response.game_url; // Bot yuboradigan to'liq url
+                        localStorage.setItem('uzchess_last_game_id', gameId);
+                        
+                        myColor = prefs.color;
+                        
+                        // Firebase Realtime DB da sinxronizatsiya strukturasini tayyorlaymiz
+                        const d = {
+                            fen: 'start', turn: 'w',
+                            initialTime: prefs.time*60, wTime: prefs.time*60, bTime: prefs.time*60,
+                            creatorColor: prefs.color, 
+                            p1_name: user.first_name, p1_id: user.id, p1_online: true,
+                            status: 'waiting'
+                        };
+
+                        db.ref('games/'+gameId).set(d).then(()=>{
+                            initBoard(true); // O'yin maydonini ishga tushirish (Kutish modalini ochadi)
+                            listenToGameUpdates(gameId);
+                        });
+                    }
+                },
+                error: function(error) {
+                    showToast("API orqali o'yin yaratishda xato: " + error.responseText);
+                }
             });
         }
 
-        // --- TASODIFIY RAQIB QIDIRISH (MATCHMAKING) ---
+        // --- TAKLIF LINKINI ULASHISH TUGMASI ---
+        $(document).on('click', '#share-link-btn', function() {
+            if (globalGameUrl) {
+                const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(globalGameUrl)}&text=${encodeURIComponent("UzChess Elite'da men bilan shaxmat o'yna! 👑")}`;
+                tg.openTelegramLink(shareUrl);
+            } else {
+                const fallbackLink = `https://t.me/UzCheess_bot/app?startapp=${gameId}`;
+                const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(fallbackLink)}&text=${encodeURIComponent("UzChess Elite'da men bilan shaxmat o'yna! 👑")}`;
+                tg.openTelegramLink(shareUrl);
+            }
+        });
+
+        // --- MATCHMAKING POOL (TASODIFIY O'YIN) ---
         function startRandom() {
             $('.screen').addClass('hidden'); $('#screen-game').removeClass('hidden');
             $('#modal-searching').show();
@@ -385,10 +399,9 @@
                 }
 
                 if (foundGameId) {
-                    // Munosib o'yin topildi - unga ulanamiz!
                     gameId = foundGameId;
                     localStorage.setItem('uzchess_last_game_id', gameId);
-                    poolRef.child(gameId).remove(); // Ro'yxatdan o'chiramiz
+                    poolRef.child(gameId).remove();
 
                     db.ref('games/'+gameId).update({
                         p2_name: user.first_name, p2_id: user.id, status: 'playing', p2_online: true
@@ -398,10 +411,10 @@
                             let gd = s.val();
                             myColor = gd.creatorColor === 'w' ? 'b' : 'w';
                             initBoard(false);
+                            listenToGameUpdates(gameId);
                         });
                     });
                 } else {
-                    // Bo'sh o'yin yo'q - yangi kutish xonasi yaratamiz
                     gameId = Math.random().toString(36).substring(2, 9);
                     localStorage.setItem('uzchess_last_game_id', gameId);
                     myColor = Math.random() > 0.5 ? 'w' : 'b';
@@ -411,20 +424,12 @@
                         initialTime: 600, wTime: 600, bTime: 600,
                         creatorColor: myColor, 
                         p1_name: user.first_name, p1_id: user.id, p1_online: true,
-                        status: 'playing' // srazi playing bo'ladi, chunki hovlidagilar kirishi bilan boshlanadi
+                        status: 'playing'
                     };
 
                     db.ref('games/'+gameId).set(d).then(() => {
                         poolRef.child(gameId).set({ p1_id: user.id, time: Date.now() });
-                        
-                        // Kimdir kirishini eshitib turamiz
-                        db.ref('games/'+gameId+'/p2_id').on('value', p2Snap => {
-                            if (p2Snap.val()) {
-                                $('#modal-searching').hide();
-                                initBoard(false);
-                                db.ref('games/'+gameId+'/p2_id').off();
-                            }
-                        });
+                        listenToGameUpdates(gameId);
                     });
                 }
             });
@@ -439,11 +444,106 @@
             goHome();
         }
 
-        // --- BOT BILAN O'YIN BOSHLASH ---
+        // --- REALTIME GAME LISTENERS ---
+        function listenToGameUpdates(gid) {
+            db.ref('games/'+gid).on('value', snapshot => {
+                const gd = snapshot.val();
+                if(!gd) return;
+
+                // Raqib ismini yangilash
+                if(myColor === gd.creatorColor) {
+                    if(gd.p2_name) {
+                        $('#name-top').text(gd.p2_name);
+                        $('#dot-top').attr('class', gd.p2_online ? 'status-dot online' : 'status-dot');
+                        if(gd.status === 'playing') $('#modal-waiting').hide();
+                    }
+                } else {
+                    $('#name-top').text(gd.p1_name);
+                    $('#dot-top').attr('class', gd.p1_online ? 'status-dot online' : 'status-dot');
+                }
+
+                // Doska holati (FEN) sinxronizatsiyasi
+                if(gd.fen && gd.fen !== 'start' && gd.fen !== game.fen()) {
+                    game.load(gd.fen);
+                    board.position(gd.fen);
+                    playSound('move');
+                }
+
+                // Vaqtlarni ko'rsatish
+                const fmt = s => {
+                    let m=Math.floor(s/60), x=Math.floor(s%60);
+                    return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;
+                };
+                if(myColor === 'w') {
+                    $('#clock-bottom').text(fmt(gd.wTime)).toggleClass('active', gd.turn === 'w');
+                    $('#clock-top').text(fmt(gd.bTime)).toggleClass('active', gd.turn === 'b');
+                } else {
+                    $('#clock-bottom').text(fmt(gd.bTime)).toggleClass('active', gd.turn === 'b');
+                    $('#clock-top').text(fmt(gd.wTime)).toggleClass('active', gd.turn === 'w');
+                }
+
+                // O'yin statusini tekshirish
+                if(gd.status.startsWith('resign_')) {
+                    let loserColor = gd.status.split('_')[1];
+                    showGameOver(loserColor === myColor ? "Siz taslim bo'ldingiz!" : "Raqib taslim bo'ldi. G'alaba!");
+                } else if(gd.status === 'timeout') {
+                    showGameOver("Vaqt tugadi!");
+                }
+            });
+        }
+
+        function showGameOver(msg) {
+            clearInterval(timerInt);
+            $('#go-msg').text(msg);
+            $('#modal-gameover').fadeIn();
+        }
+
+        // --- KLASSIK CHLICK KLIK (PIESALARNI YURITISH) ---
+        function handleSquareClick() {
+            if (isBotMode && game.turn() !== myColor.charAt(0)) return;
+            
+            let square = $(this).attr('data-square');
+            
+            if (selectedSquare === square) {
+                selectedSquare = null;
+                $('.square-55d63').removeClass('highlight-active highlight-move');
+                return;
+            }
+
+            let move = game.move({ from: selectedSquare, to: square, promotion: 'q' });
+
+            if (move) {
+                board.position(game.fen());
+                highlightLastMove(selectedSquare, square);
+                playSound(move.captured ? 'capture' : 'move');
+                selectedSquare = null;
+                $('.square-55d63').removeClass('highlight-active highlight-move');
+
+                if (isBotMode) {
+                    checkBotGameStatus();
+                    if (!game.game_over()) setTimeout(makeBotMove, 800);
+                } else {
+                    // Firebase DB ni yangilash
+                    db.ref('games/'+gameId).update({
+                        fen: game.fen(),
+                        turn: game.turn()
+                    });
+                }
+            } else {
+                selectedSquare = square;
+                $('.square-55d63').removeClass('highlight-active highlight-move');
+                $(this).addClass('highlight-active');
+                
+                let moves = game.moves({ square: square, verbose: true });
+                moves.forEach(m => { $('.square-' + m.to).addClass('highlight-move'); });
+            }
+        }
+
+        // --- BOT REJIM MATN VA VAQT SOZLAMALARI ---
         function startBotGame() {
             isBotMode = true;
             gameId = null;
-            myColor = prefs.color === 'w' ? 'w' : (prefs.color === 'b' ? 'b' : (Math.random() > 0.5 ? 'w' : 'b'));
+            myColor = prefs.color === 'w' ? 'w' : 'b';
             
             $('.screen').addClass('hidden'); $('#screen-game').removeClass('hidden');
             $('#modal-waiting').hide(); $('#modal-searching').hide(); $('#modal-join').hide();
@@ -466,18 +566,14 @@
             botBTime = prefs.time * 60;
             startBotClocks();
 
-            if (myColor === 'b') {
-                setTimeout(makeBotMove, 800); // Agar Bot oq bo'lsa srazi yuradi
-            }
+            if (myColor === 'b') setTimeout(makeBotMove, 800);
         }
 
-        // Botning aqlli tasodifiy yurishi (JS Engine)
         function makeBotMove() {
             if (game.game_over()) return;
             const moves = game.moves({ verbose: true });
             if (moves.length === 0) return;
 
-            // Shaxmat mantig'ini yanada jonli qilish uchun: urish yoki markazga intilish yurishlarini afzal ko'radi
             let move = moves[Math.floor(Math.random() * moves.length)];
             const captures = moves.filter(m => m.flags.includes('c'));
             if (captures.length > 0) move = captures[Math.floor(Math.random() * captures.length)];
@@ -485,10 +581,7 @@
             game.move(move);
             board.position(game.fen());
             highlightLastMove(move.from, move.to);
-            
-            if (game.in_check()) playSound('check');
-            else if (move.flags.includes('c')) playSound('capture');
-            else playSound('move');
+            playSound(game.in_check() ? 'check' : (move.flags.includes('c') ? 'capture' : 'move'));
 
             checkBotGameStatus();
         }
@@ -496,32 +589,18 @@
         function checkBotGameStatus() {
             if (game.game_over()) {
                 clearInterval(timerInt);
-                let title = "O'yin tugadi";
-                let msg = "";
-                if (game.in_checkmate()) {
-                    if (game.turn() === myColor.charAt(0)) {
-                        title = "Mag'lubiyat..."; msg = "Bot sizni mot qildi!"; playSound('lose');
-                    } else {
-                        title = "G'alaba!"; msg = "Siz botni mot qildingiz, daxshat!"; playSound('win');
-                    }
-                } else {
-                    title = "Durrang!"; msg = "O'yin durrang bilan yakunlandi."; playSound('notify');
-                }
-                $('#go-title').text(title); $('#go-msg').text(msg);
-                $('#modal-gameover').fadeIn();
+                let msg = game.in_checkmate() ? (game.turn() === myColor ? "Bot sizni mot qildi!" : "Siz g'olib bo'ldingiz!") : "Durrang!";
+                showGameOver(msg);
             }
         }
 
         function startBotClocks() {
             clearInterval(timerInt);
-            const fmt=s=>{let m=Math.floor(s/60),x=Math.floor(s%60);return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;};
-            
+            const fmt = s => { let m=Math.floor(s/60), x=Math.floor(s%60); return (m<10?'0':'')+m+':'+(x<10?'0':'')+x; };
             timerInt = setInterval(() => {
-                if (game.turn() === 'w') {
-                    botWTime--; if (botWTime <= 0) { clearInterval(timerInt); showBotTimeout('w'); }
-                } else {
-                    botBTime--; if (botBTime <= 0) { clearInterval(timerInt); showBotTimeout('b'); }
-                }
+                if (game.turn() === 'w') botWTime--; else botBTime--;
+                if(botWTime<=0 || botBTime<=0) { clearInterval(timerInt); showGameOver("Vaqt tugadi!"); return; }
+                
                 if(myColor==='w') {
                     $('#clock-bottom').text(fmt(botWTime)).toggleClass('active', game.turn()==='w');
                     $('#clock-top').text(fmt(botBTime)).toggleClass('active', game.turn()==='b');
@@ -532,71 +611,38 @@
             }, 1000);
         }
 
-        function showBotTimeout(loser) {
-            let title = loser === myColor.charAt(0) ? "Vaqtingiz tugadi!" : "Botning vaqti tugadi!";
-            let msg = loser === myColor.charAt(0) ? "Mag'lubiyat." : "Daxshatli g'alaba!";
-            $('#go-title').text(title); $('#go-msg').text(msg);
-            $('#modal-gameover').fadeIn();
-        }
-
-        // --- BOT VA ULASHISH SCRIPT METODLARI ---
-        function shareLink() {
-            const tgLink = `https://t.me/${botUsername}/app?startapp=${gameId}`;
-            const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(tgLink)}&text=${encodeURIComponent("UzChess Elite'da men bilan shaxmat o'yna! 👑")}`;
-            if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.openTelegramLink(shareUrl);
-            } else {
-                navigator.clipboard.writeText(tgLink);
-                showToast("O'yin havolasi nusxalandi!");
-            }
-        }
-
         function loadGame(gid) {
             db.ref('games/'+gid).once('value', s=>{
                 const d = s.val();
                 if(!d) { showToast("O'yin topilmadi!"); goHome(); return; }
-
-                if(d.p1_id == user.id) {
-                    myColor = d.creatorColor;
-                    initBoard(d.status==='waiting');
-                }
-                else if(d.p2_id == user.id) {
-                    myColor = (d.creatorColor==='w'?'b':'w');
-                    initBoard(false);
-                }
+                if(d.p1_id == user.id) { myColor = d.creatorColor; initBoard(d.status==='waiting'); listenToGameUpdates(gid); }
                 else if(!d.p2_id) {
                     $('#join-opp').text(d.p1_name);
                     $('#join-time').text((d.initialTime/60)+" min");
-                    let hisC = d.creatorColor;
-                    $('#join-color').text(hisC==='w' ? "Qora" : "Oq");
+                    $('#join-color').text(d.creatorColor==='w' ? "Qora" : "Oq");
                     $('.screen').addClass('hidden'); $('#screen-game').removeClass('hidden');
                     $('#modal-join').show();
-                } 
-                else { showToast("O'yin to'la!"); goHome(); }
+                } else if(d.p2_id == user.id) { myColor = (d.creatorColor==='w'?'b':'w'); initBoard(false); listenToGameUpdates(gid); }
+                else { showToast("O'yin allaqachon to'la!"); goHome(); }
             });
         }
 
         function acceptGame() {
             localStorage.setItem('uzchess_last_game_id', gameId);
             $('#modal-join').hide();
-            db.ref('games/'+gameId).once('value', s=>{
-                const d = s.val();
-                myColor = (d.creatorColor==='w'?'b':'w'); 
-                db.ref('games/'+gameId).update({
-                    p2_name: user.first_name, p2_id: user.id, status: 'playing', p2_online: true
+            db.ref('games/'+gameId).update({ p2_name: user.first_name, p2_id: user.id, status: 'playing', p2_online: true }).then(()=>{
+                db.ref('games/'+gameId).once('value', s=>{
+                    let d = s.val();
+                    myColor = (d.creatorColor==='w'?'b':'w');
+                    initBoard(false);
+                    listenToGameUpdates(gameId);
                 });
-                initBoard(false);
             });
         }
 
         function initBoard(isWaiting) {
             $('.screen').addClass('hidden'); $('#screen-game').removeClass('hidden');
-            $('#wait-time').text(prefs.time+" min");
-            $('#wait-color').text(myColor==='w'?"Oq":"Qora");
-            
             if(isWaiting) $('#modal-waiting').show(); else $('#modal-waiting').hide();
-            $('#modal-join').hide();
-            $('#modal-gameover').hide();
 
             game = new Chess();
             if(board) board.destroy();
@@ -606,230 +652,17 @@
                 orientation: myColor==='w'?'white':'black',
                 pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
             });
-
             $('#myBoard').off('click').on('click', '.square-55d63', handleSquareClick);
-            if(gameId) listenGame();
-        }
-
-        function handleSquareClick() {
-            if (game.turn() !== myColor.charAt(0)) return; 
-            
-            const sq = $(this).attr('data-square');
-            const p = game.get(sq);
-            if(!selectedSquare) {
-                if(p && p.color===myColor.charAt(0)) { selectedSquare=sq; highlight(sq); }
-                return;
-            }
-            if(selectedSquare===sq) { clearHi(); selectedSquare=null; return; }
-            if(p && p.color===myColor.charAt(0)) { selectedSquare=sq; highlight(sq); return; }
-
-            const m = game.move({from:selectedSquare, to:sq, promotion:'q'});
-            if(m) {
-                if (game.in_check()) playSound('check');
-                else if (m.flags.includes('c') || m.flags.includes('e')) playSound('capture');
-                else playSound('move');
-
-                highlightLastMove(selectedSquare, sq);
-
-                if (isBotMode) {
-                    board.position(game.fen());
-                    clearHi(); selectedSquare=null;
-                    checkBotGameStatus();
-                    if (!game.game_over()) {
-                        setTimeout(makeBotMove, 700);
-                    }
-                } else {
-                    let updateData = {
-                        fen: game.fen(), 
-                        turn: game.turn(),
-                        lastMove: { from: selectedSquare, to: sq }
-                    };
-                    if (game.in_checkmate()) updateData.status = 'checkmate'; 
-                    db.ref('games/'+gameId).update(updateData);
-                    board.position(game.fen());
-                    clearHi(); selectedSquare=null;
-                }
-            } else { clearHi(); selectedSquare=null; }
-        }
-        
-        function highlight(sq) {
-            clearHi(); $('.square-'+sq).addClass('highlight-active');
-            game.moves({square:sq, verbose:true}).forEach(m=>$('.square-'+m.to).addClass('highlight-move'));
-        }
-        function clearHi() { $('.square-55d63').removeClass('highlight-active highlight-move'); }
-
-        let prevFen = "start";
-
-        function listenGame() {
-            const con = db.ref(`games/${gameId}/${myColor==='w'?'p1_online':'p2_online'}`);
-            con.set(true); con.onDisconnect().set(false);
-
-            db.ref('games/'+gameId).on('value', s=>{
-                const d = s.val();
-                if(!d || isBotMode) return;
-
-                p1_id_cached = d.p1_id;
-                creatorColor_cached = d.creatorColor;
-                initialTime_cached = d.initialTime;
-
-                let correctColor = (d.p1_id == user.id) ? d.creatorColor : (d.creatorColor==='w'?'b':'w');
-                if(myColor !== correctColor) {
-                    myColor = correctColor;
-                    board.orientation(myColor==='w'?'white':'black');
-                }
-
-                if(d.status==='playing') {
-                    if ($('#modal-waiting').is(':visible')) playSound('start');
-                    $('#modal-waiting').fadeOut();
-                    $('#modal-gameover').fadeOut();
-                }
-
-                if (d.fen === 'start' || d.fen.startsWith("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")) {
-                    if (game.history().length > 0 || game.fen() !== "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {
-                         game = new Chess(); 
-                         board.position('start');
-                         clearHi();
-                         highlightLastMove(null, null);
-                         prevFen = "start";
-                    }
-                } 
-                else if(d.fen !== game.fen()) {
-                    if (game.turn() !== myColor.charAt(0)) {
-                         let tempGame = new Chess(prevFen);
-                         game.load(d.fen);
-                         board.position(d.fen);
-                         
-                         if (d.lastMove) highlightLastMove(d.lastMove.from, d.lastMove.to);
-
-                         if(game.in_check()) playSound('check');
-                         else {
-                             let piecesBefore = tempGame.fen().split(' ')[0].replace(/[^a-z]/gi, '').length;
-                             let piecesAfter = game.fen().split(' ')[0].replace(/[^a-z]/gi, '').length;
-                             if(piecesAfter < piecesBefore) playSound('capture');
-                             else playSound('move');
-                         }
-                    } else {
-                         game.load(d.fen);
-                         board.position(d.fen);
-                         if (d.lastMove) highlightLastMove(d.lastMove.from, d.lastMove.to);
-                    }
-                    clearHi();
-                }
-                prevFen = d.fen;
-
-                updateClocks(d);
-                
-                const isP1 = (user.id == d.p1_id);
-                $('#name-top').text(isP1 ? (d.p2_name||"Kutilmoqda") : d.p1_name);
-                let oppOn = isP1 ? d.p2_online : d.p1_online;
-                $('#dot-top').attr('class', 'status-dot '+(oppOn?'online':''));
-
-                if(d.status!=='playing' && d.status!=='waiting' && d.status!=='draw_offer') {
-                    if(!window.endAlert) {
-                        window.endAlert = true;
-                        let title = "O'yin tugadi";
-                        let msg = "";
-                        let winner = null; 
-                        
-                        if(d.status.includes('resign_w')) winner = 'b';
-                        else if(d.status.includes('resign_b')) winner = 'w';
-                        else if(d.status === 'checkmate') winner = (d.turn === 'w' ? 'b' : 'w');
-                        else if(d.status === 'timeout') winner = (d.turn === 'w' ? 'b' : 'w');
-
-                        if(d.status === 'draw') {
-                            title = "Durrang!"; msg = "Tomonlar kelishib oldi"; playSound('notify');
-                        } 
-                        else if(winner) {
-                            if(winner === myColor.charAt(0)) {
-                                title = "G'alaba!"; msg = "Tabriklaymiz, siz yutdingiz!"; playSound('win');
-                            } else {
-                                title = "Mag'lubiyat..."; msg = "Afsuski, siz yutqazdingiz."; playSound('lose');
-                            }
-                        }
-                        $('#go-title').text(title); $('#go-msg').text(msg);
-                        $('#modal-gameover').fadeIn();
-                    }
-                } else { if(d.status==='playing') window.endAlert=false; }
-            });
-
-            db.ref('chats/'+gameId).off('child_added');
-            db.ref('chats/'+gameId).on('child_added', s=>{
-                const m=s.val();
-                $('#chat-msgs').append(`<div class="msg"><b>${m.u}:</b> ${m.t}</div>`);
-                document.getElementById('chat-msgs').scrollTop=99999;
-                if(!isChatOpen && m.u !== user.first_name) {
-                    playSound('notify');
-                    $('#chat-btn').addClass('has-msg'); 
-                }
-            });
-        }
-
-        function rematch() {
-            $('#modal-gameover').hide();
-            if(isBotMode) {
-                startBotGame();
-            } else {
-                if(user.id == p1_id_cached) {
-                    let newC = creatorColor_cached==='w'?'b':'w';
-                    db.ref('games/'+gameId).update({
-                        fen:'start', turn:'w', status:'playing',
-                        wTime:initialTime_cached, bTime:initialTime_cached,
-                        creatorColor: newC, drawOffer: null, lastMove: null 
-                    });
-                } else { showToast("Host o'yinni boshlashi kutilmoqda..."); }
-            }
-        }
-
-        function updateClocks(d) {
-            if (isBotMode) return;
-            const fmt=s=>{let m=Math.floor(s/60),x=Math.floor(s%60);return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;};
-            if(myColor==='w') {
-                $('#clock-bottom').text(fmt(d.wTime)).toggleClass('active', d.turn==='w');
-                $('#clock-top').text(fmt(d.bTime)).toggleClass('active', d.turn==='b');
-            } else {
-                $('#clock-bottom').text(fmt(d.bTime)).toggleClass('active', d.turn==='b');
-                $('#clock-top').text(fmt(d.wTime)).toggleClass('active', d.turn==='w');
-            }
-            
-            if(d.status==='playing' && user.id==d.p1_id) {
-                if(!timerInt) {
-                    timerInt = setInterval(()=>{
-                        db.ref('games/'+gameId).once('value', snapshot=>{
-                            const gd=snapshot.val();
-                            if(!gd || gd.status!=='playing') { clearInterval(timerInt); timerInt=null; return; }
-                            let updates={};
-                            if(gd.turn==='w') {
-                                updates.wTime = Math.max(0, gd.wTime - 1); if(updates.wTime===0) updates.status='timeout';
-                            } else {
-                                updates.bTime = Math.max(0, gd.bTime - 1); if(updates.bTime===0) updates.status='timeout';
-                            }
-                            if(Object.keys(updates).length > 0) db.ref('games/'+gameId).update(updates);
-                        });
-                    }, 1000);
-                }
-            } else { if(timerInt) { clearInterval(timerInt); timerInt=null; } }
         }
 
         function gameAction(action) {
-            if(isBotMode) {
-                if(action==='resign') { if(confirm("Taslim bo'lasizmi?")) { clearInterval(timerInt); $('#go-title').text("Mag'lubiyat"); $('#go-msg').text("Botga taslim bo'ldingiz."); $('#modal-gameover').fadeIn(); } }
-                return;
-            }
-            if (!gameId) return;
-            if (action === 'resign') {
-                if (confirm("Haqiqatdan ham taslim bo'lmoqchimisiz?")) db.ref('games/' + gameId).update({ status: 'resign_' + myColor });
-            }
+            if(isBotMode && action==='resign') { if(confirm("Taslim bo'lasizmi?")) showGameOver("Botga taslim bo'ldingiz."); return; }
+            if(!gameId) return;
+            if(action==='resign') { if(confirm("Taslim bo'lmoqchimisiz?")) db.ref('games/'+gameId).update({ status: 'resign_'+myColor }); }
         }
 
-        function sendChat() {
-            const msg = $('#chat-in').val().trim();
-            if (!msg || !gameId || isBotMode) return;
-            db.ref('chats/' + gameId).push({ u: user.first_name, t: msg });
-            $('#chat-in').val('');
-        }
-
-        $('#chat-in').on('keypress', function(e) { if (e.which === 13) sendChat(); });
-        if (gameId && !tg.initDataUnsafe?.start_param) { loadGame(gameId); }
+        // Dastlabki yuklanishda parametr bormi yo'qmi tekshirish
+        if(gameId) loadGame(gameId);
     </script>
 </body>
 </html>

@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -6,6 +7,7 @@ from sqlalchemy.orm import Session
 from database.database import SessionLocal
 from database.crud import create_custom_game
 
+# Asosiy FastAPI obyektini yaratamiz
 app = FastAPI(title="UzChess Web App API")
 
 # HTML andozalar (templates) turgan papkani tanitamiz
@@ -20,7 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ma'lumotlar bazasiga ulanish uchun yordamchi
+# Ma'lumotlar bazasiga ulanish uchun yordamchi (Dependency)
 def get_db():
     db = SessionLocal()
     try:
@@ -31,6 +33,7 @@ def get_db():
 # 1. Foydalanuvchi Web App'ni ochganda index.html sahifasini ko'rsatish
 @app.get("/", response_class=HTMLResponse)
 def read_index(request: Request):
+    # index.html faylini daxshatli muvaffaqiyatli render qilamiz
     return templates.TemplateResponse(request=request, name="index.html")
 
 # 2. O'yinchi Web App'da o'yin yaratganda chaqiriladigan API yo'li
@@ -40,8 +43,10 @@ def api_create_game(creator_id: int, time_limit: int, chosen_color: str, db: Ses
         # Ma'lumotlar bazasida o'yin yaratamiz
         game = create_custom_game(db, creator_id=creator_id, time_limit=time_limit, chosen_color=chosen_color)
         
-        # 🔥 DIQQAT: Bot yuzerneymi sizniki bilan almashtirildi!
-        game_url = f"https://t.me/UzCheess_bot/app?startapp=game_{game.id}"
+        # 🔥 BOT USERNAME VA STARTAPP TIZIMI MUKAMMAL HOLATGA KELTIRILDI!
+        # Telegram t.me/bot/app havola formati: startapp parametrini to'g'ridan-to'g'ri o'yin ID si qilamiz
+        bot_username = "UzCheess_bot"
+        game_url = f"https://t.me/{bot_username}/app?startapp={game.id}"
         
         return {
             "status": "success",
