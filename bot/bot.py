@@ -1,6 +1,7 @@
 import os
 import json
-from fastapi import Request, Response
+from contextlib import asynccontextmanager
+from fastapi import Request, Response, FastAPI
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from database.database import SessionLocal
@@ -12,8 +13,11 @@ TOKEN = "8831656585:AAE8yeqGju6sZJopRcNWVJJqoTdLDf4Jl6U"
 CHANNEL_ID = -1003900981353      
 CHANNEL_USERNAME = "@UzCheess"
 
-# Global application obyekti (Webhook va Polling uchun)
+# Global application obyekti
 telegram_app = Application.builder().token(TOKEN).build()
+
+# Webhook path (Xavfsizlik uchun token bilan)
+WEBHOOK_PATH = f"/webhook/{TOKEN}"
 
 # Kanalga a'zolikni tekshirish
 async def check_subscription(bot, user_id: int) -> bool:
@@ -28,7 +32,7 @@ async def check_subscription(bot, user_id: int) -> bool:
 
 # Asosiy menyu
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, user, tg_user):
-    # Render loyiha havolasi
+    # Render loyiha havolasi yoki lokal xost
     web_app_url = "https://uzchessbot.onrender.com/" if os.environ.get("PORT") else "http://127.0.0.1:8000/"
 
     keyboard = [
@@ -65,7 +69,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     game_id = None
     if args and args[0]:
-        game_id = args[0] # To'g'ridan-to'g'ri game_id parametrini oladi
+        game_id = args[0]
 
     db = SessionLocal()
     user = get_or_create_user(db, telegram_id=user_id, username=tg_user.username)
@@ -90,7 +94,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if game_id:
-        # Foydalanuvchi link ustiga bosganda, uni srazi Mini App o'yin xonasiga yo'naltiramiz
         web_app_url = f"https://uzchessbot.onrender.com/?g={game_id}" if os.environ.get("PORT") else f"http://127.0.0.1:8000/?g={game_id}"
         keyboard = [[InlineKeyboardButton("🎮 Jangga qo'shilish", web_app=WebAppInfo(url=web_app_url))]]
         
@@ -137,7 +140,7 @@ async def check_sub_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     else:
         await context.bot.send_message(
             chat_id=user_id,
-            text=f"Siz hali ham {CHANNEL_USERNAME} kanaliga a'zo bo'lmazin giz. ❌\nIltimos, oldin a'zo bo'ling."
+            text=f"Siz hali ham {CHANNEL_USERNAME} kanaliga a'zo bo'lmadingiz. ❌\nIltimos, oldin a'zo bo'ling."
         )
 
 # Menyu tugmalari mantig'i
@@ -156,30 +159,50 @@ telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(CallbackQueryHandler(check_sub_callback, pattern="^check_sub_"))
 telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu_buttons))
 
-# FastAPI uchun Webhook integratsiyasi
-def init_telegram_webhook(fastapi_app):
-    RENDER_URL = "https://uzchessbot.onrender.com"
-    WEBHOOK_PATH = f"/webhook/{TOKEN}"
+
+# 🔥 MODERNIY LIFESPAN DIZAYNI (Eski add_event_handler o'rniga)
+@asynccontextmanager
+async def lifespan(fastapi_app: FastAPI):
+    # ---- STARTUP: Server yoqqanda faqat 1 marta ishlaydi ----
+    PORT_ENV = os.environ.get("PORT")
     
+    # Bot tizimini 1 marta to'liq initsializatsiya qilamiz
+    await telegram_app.initialize()
+    
+    if PORT_ENV:
+        print("-> [Lifespan] Render muhiti. Telegram Webhook sozlanmoqda...")
+        RENDER_URL = "https://uzchessbot.onrender.com"
+        full_webhook_url = f"{RENDER_URL}{WEBHOOK_PATH}"
+        
+        await telegram_app.bot.set_webhook(url=full_webhook_url)
+        print(f"✅ Webhook o'rnatildi: {full_webhook_url}")
+    else:
+        print("-> [Lifespan] Lokal muhit. Polling ishga tushmoqda...")
+        await telegram_app.start()
+        import asyncio
+        asyncio.create_task(telegram_app.updater.start_polling())
+        print("✅ Polling fonda muvaffaqiyatli boshlandi!")
+
+    yield  # <-- Shu joyda FastAPI kelayotgan so'rovlarni (HTTP va Webhook) qabul qilishni boshlaydi
+
+    # ---- SHUTDOWN: Server o'chirilganda xavfsiz yopiladi ----
+    print("-> [Lifespan] Server o'chmoqda. Bot jarayonlari to'xtatilmoqda...")
+    if not PORT_ENV:
+        await telegram_app.updater.stop()
+        await telegram_app.stop()
+    await telegram_app.shutdown()
+    print("✅ Bot xavfsiz yopildi.")
+
+
+# FastAPI uchun Webhook routerini sozlash funkiyasi
+def init_telegram_webhook(fastapi_app: FastAPI):
     @fastapi_app.post(WEBHOOK_PATH)
     async def telegram_webhook_endpoint(request: Request):
         try:
             req_body = await request.json()
             update = Update.de_json(req_body, telegram_app.bot)
-            await telegram_app.initialize()
+            # Lifespan ichida initialize qilingani sababli faqat update'ni yuboramiz
             await telegram_app.process_update(update)
         except Exception as e:
-            print(f"Webhook process xatosi: {e}")
+            print(f"❌ Webhook ichida xatolik: {e}")
         return Response(status_code=200)
-
-    async def set_webhook_on_startup():
-        await telegram_app.bot.set_webhook(url=f"{RENDER_URL}{WEBHOOK_PATH}")
-        print(f"-> Telegram Webhook o'rnatildi: {RENDER_URL}{WEBHOOK_PATH}")
-
-    # FastAPI startup qismiga webhook o'rnatishni qo'shamiz
-    fastapi_app.add_event_handler("startup", set_webhook_on_startup)
-
-# Lokal test uchun polling rejimini saqlab qolamiz
-def run_bot_polling():
-    print("Bot Polling rejimida daxshatli ishga tushmoqda...")
-    telegram_app.run_polling()

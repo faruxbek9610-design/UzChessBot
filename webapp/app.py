@@ -4,11 +4,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+
 from database.database import SessionLocal
 from database.crud import create_custom_game
+# 🔥 Bot faylidan yangi lifespan va webhook sozlagichni import qilamiz
+from bot.bot import lifespan, init_telegram_webhook
 
-# Asosiy FastAPI obyektini yaratamiz
-app = FastAPI(title="UzChess Web App API")
+# Asosiy FastAPI obyektini LIFESPAN bilan birga yaratamiz
+app = FastAPI(
+    title="UzChess Web App API",
+    lifespan=lifespan  # <-- Server yoqilganda botni, o'chganda webhookni tartibga soladi
+)
 
 # HTML andozalar (templates) turgan papkani tanitamiz
 templates = Jinja2Templates(directory="webapp/templates")
@@ -30,11 +36,23 @@ def get_db():
     finally:
         db.close()
 
+# -------------------------------------------------------------------
+# 🔥 TELEGRAM WEBHOOK ENDPOINTINI RO'YXATDAN O'TKAZISH
+# -------------------------------------------------------------------
+# Bot ichidagi /webhook/{TOKEN} yo'lini FastAPI ilovasiga ulaydi
+init_telegram_webhook(app)
+
+
+# -------------------------------------------------------------------
+# WEBPAGE VA API ROUTE'LARI
+# -------------------------------------------------------------------
+
 # 1. Foydalanuvchi Web App'ni ochganda index.html sahifasini ko'rsatish
 @app.get("/", response_class=HTMLResponse)
 def read_index(request: Request):
     # index.html faylini daxshatli muvaffaqiyatli render qilamiz
     return templates.TemplateResponse(request=request, name="index.html")
+
 
 # 2. O'yinchi Web App'da o'yin yaratganda chaqiriladigan API yo'li
 @app.post("/api/game/create")
